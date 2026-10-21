@@ -1,0 +1,74 @@
+# Production stack for the GCP VM. The deploy job (.gitlab-ci.yml) copies this
+# file to /srv/app/docker-compose.yml and exports CI_REGISTRY_IMAGE and
+# IMAGE_TAG before `docker compose pull`. Secrets come from /srv/app/.env,
+# which lives only on the VM.
+#
+# TODO(T5): add ollama, infinity and chromadb here with named volumes and no
+# published ports (deployment_instructions.md, Part 7).
+services:
+  nginx:
+    image: ${CI_REGISTRY_IMAGE}/nginx:${IMAGE_TAG}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - qna_network
+
+  backend:
+    image: ${CI_REGISTRY_IMAGE}/backend:${IMAGE_TAG}
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - APP_ENV=production
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - qna_network
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  mysql:
+    image: mysql:8.0
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: qna
+      MYSQL_USER: app_user
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - qna_network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "app_user", "-p${MYSQL_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 45s
+
+  redis:
+    image: redis:7.0-alpine
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - qna_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    command: redis-server --appendonly yes --appendfsync everysec --maxmemory 512mb --maxmemory-policy allkeys-lru
+
+volumes:
+  mysql_data:
+  redis_data:
+
+networks:
+  qna_network:
+    driver: bridge
