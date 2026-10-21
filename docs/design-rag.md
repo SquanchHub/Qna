@@ -1,6 +1,6 @@
 # RAG Auto-Responder: Design
 
-Status: revised after the Goldfish review (§13). Owners: vzhou2 (backend), varikooty (frontend, tests, deploy). This is the authoritative spec for T4–T7; if implementation proves it wrong, update this document first, then the code.
+Status: revised after the Goldfish review (§13). Owners: vzhou2 (core backend, deploy), varikooty (Compose services, chunking, frontend, integration tests); see `docs/schedule.md`. This is the authoritative spec for T4–T7; if implementation proves it wrong, update this document first, then the code.
 
 ---
 
@@ -224,7 +224,7 @@ The project name comes from `COMPOSE_PROJECT_NAME=qna-74` in `.env`, equal to to
 
 - **Models.** `INFINITY_MODEL_ID="sentence-transformers/all-MiniLM-L6-v2;BAAI/bge-small-en-v1.5;Alibaba-NLP/gte-Qwen2-1.5B-instruct;"`, `INFINITY_BATCH_SIZE="32;32;4;"`. Low-RAM laptops may drop gte locally.
 - **Pooling.** We never pass `--pooling-method` (Infinity offers only `mean`, `cls`, `auto`). The torch engine runs SentenceTransformers, which applies each model's `1_Pooling/config.json`: mean (MiniLM), CLS (bge), last-token (gte-Qwen2, `pooling_mode_lasttoken: true`, `trust_remote_code`). Outputs are L2-normalized. Verified at M1 (U2).
-- **Prod.** `docker-compose.prod.yml` (varikooty) mirrors this, publishes only nginx 80, sets `APP_ENV=production`, `mem_limit` ≈ 9 GB (infinity) and 4 GB (ollama). The Dockerfile adds `git`. New requirements: `chromadb-client==<server version>`, `beautifulsoup4`, `lxml`, `pypdf`, `psutil`, `tokenizers`, `httpx` (runtime).
+- **Prod.** `docker-compose.prod.yml` (vzhou2) mirrors this, publishes only nginx 80, sets `APP_ENV=production`, `mem_limit` ≈ 9 GB (infinity) and 4 GB (ollama). The Dockerfile adds `git`. New requirements: `chromadb-client==<server version>`, `beautifulsoup4`, `lxml`, `pypdf`, `psutil`, `tokenizers`, `httpx` (runtime).
 
 #### 4.3.2 Environment (`config.py`, `.env.template`); "initial" values are to tune
 
@@ -558,7 +558,7 @@ Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_ro
 | `backend/app/routers/rag.py`, `main.py`, `routers/qa.py`, `routers/admin.py` | C, M | Routes; answer trigger; `SYSTEM_ACCOUNT` guards and Q&A resource on course create |
 | `backend/app/common/exceptions.py`, `config.py`, `requirements.txt`, `Dockerfile`, `*/README.md` | M | Errors, settings, deps, `git`, docs |
 | `docker-compose.yml`, `.env.template` | M | Services, volumes, variables |
-| `docker-compose.prod.yml`, `.gitlab-ci.yml` | C, M | Deploy (varikooty) |
+| `docker-compose.prod.yml`, `.gitlab-ci.yml` | C, M | Deploy (vzhou2) |
 | `tests/unit/test_chunking.py`, `test_citations.py`, `test_rag_misc.py` | C | §10 |
 | `tests/integration/test_rag_{access,ingestion,compare,board}.py`, `fixtures/rag/`, `requirements.txt` | C, M | §10 (+ `pymysql`) |
 | `eval/calibrate_threshold.py`, `eval/preflight.py`, `eval/configs.json`, `eval/report.{json,md}` | C | §11, T6 evidence |
@@ -567,19 +567,19 @@ Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_ro
 
 ## 9. Implementation order (test-first)
 
-Ownership per `docs/schedule.md`: vzhou2 owns `backend/`, `docker-compose.yml`, backend `eval/`; varikooty owns `frontend/`, `tests/integration/test_rag_*.py`, `.gitlab-ci.yml`, deploy files. Each milestone starts with failing tests; `ruff check`, `ruff format --check` and `tsc --noEmit` pass before each MR.
+Ownership per `docs/schedule.md`: vzhou2 owns deployment (VM, `docker-compose.prod.yml`, `.gitlab-ci.yml`) and the rest of `backend/` and backend `eval/`; varikooty owns `docker-compose.yml`, `.env.template`, `services/rag/{clients,tokens,chunking,citations}.py` and their unit tests, `frontend/`, `tests/integration/test_rag_*.py`. Each milestone starts with failing tests; `ruff check`, `ruff format --check` and `tsc --noEmit` pass before each MR.
 
 | # | Milestone (owner) | Tests first | Done when |
 |---|---|---|---|
 | M0 | Goldfish revision; agree §6 at the 10-23 check-in (vzhou2) | — | Doc on `main` before code |
-| M1 | Compose services, pull, config, health, `git` (vzhou2) | health cases (varikooty) | Health all `ok` with models |
+| M1 | Compose services, pull, config, health, `git` (varikooty) | health cases (varikooty) | Health all `ok` with models |
 | M2 | Migration, models, system user, Q&A bootstrap, `ai_status`, serializers, admin guards (vzhou2) | serializer and decline unit tests | Clean upgrade; existing tests green |
-| M3 | Tokenizer, chunkers, citations (vzhou2) | `test_chunking`, `test_citations` | Green on `eval/sample_data` |
+| M3 | Tokenizer, chunkers, citations (varikooty) | `test_chunking`, `test_citations` | Green on `eval/sample_data` |
 | M4 | Fetchers, jobs, re-sync, profile/resource APIs (vzhou2) | `test_rag_ingestion` (varikooty) | Upload path and URL path both ingest |
 | M4f | Resources and Profiles pages, upload helper (varikooty) | manual vs §6 (mock JSON until M4) | Register, upload, sync, delete work |
 | M5 | Pipeline, compare, answer job, prompts, locks, metrics (vzhou2) | `test_rag_compare`, `test_rag_board` (varikooty) | Contract and dry-run green |
 | M5f | AI badge, sources, polling, `?course=` (varikooty) | manual e2e | Labeled, cited answer; accept works |
-| M6 | Prod compose, CI deploy, VM, seed, models (varikooty) | `/api/health`, `/api/rag/health` on VM | Deployment up |
+| M6 | Prod compose, CI deploy, VM, seed, models (vzhou2) | `/api/health`, `/api/rag/health` on VM | Deployment up |
 | M7 | Eval on the VM (both) | `eval/preflight.py` passes | Report committed from the deployment |
 
 ---
