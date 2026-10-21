@@ -21,7 +21,8 @@ varikooty starts on 2026-10-23 with the pieces that depend on nothing else (Comp
 | `docs/design-rag.md` drafted in the Elephant session, including the API endpoints the frontend will call | T3 | vzhou2 | 2026-10-19 |
 | Goldfish test run and `docs/design-rag.md` revised | T3 | vzhou2 | 2026-10-20 |
 | `build` and `deploy` stages in `.gitlab-ci.yml` and `docker-compose.prod.yml` (deployment guide Parts 6–7) | T9 | vzhou2 | 2026-10-20 |
-| GCP credit, VM with static IP and Docker, VM `.env`, Workload Identity Federation, and the `deploy_full_stack` project ID/number filled in (Parts 1, 2 and 5) | T9 | vzhou2 | 2026-10-22 |
+| GCP credit and project `qna-vzhou2`, Workload Identity Federation, and the `deploy_full_stack` project ID/number filled in (Parts 1 and 5) | T9 | vzhou2 | 2026-10-20 |
+| VM `production-web-server` with static IP, Docker, OS Login and `/srv/app/.env` (Part 2) | T9 | vzhou2 | 2026-10-22 |
 | Ollama, Infinity and ChromaDB running in `docker-compose.yml`, model pulls, service clients and `GET /api/rag/health` | T5 | varikooty | 2026-10-24 |
 | Tokenizer, type-tailored chunkers and citation helpers, with unit tests passing on `eval/sample_data/` | T4 | varikooty | 2026-10-25 |
 | Migration `002_rag`, RAG models, system user, Q&A resource bootstrap and serializers | T4, T5 | vzhou2 | 2026-10-25 |
