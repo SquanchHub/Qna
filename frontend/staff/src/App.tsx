@@ -1,11 +1,13 @@
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
-import { LogOut, MessageSquare, Tags } from 'lucide-react';
+import { Database, Layers, LogOut, MessageSquare, Tags } from 'lucide-react';
 import { CourseProvider, useCourse } from './lib/CourseContext';
 import LoginPage from './pages/LoginPage';
 import QuestionsPage from './pages/QuestionsPage';
 import AskQuestionPage from './pages/AskQuestionPage';
 import QuestionDetailPage from './pages/QuestionDetailPage';
 import CategoriesPage from './pages/CategoriesPage';
+import ResourcesPage from './pages/ResourcesPage';
+import ProfilesPage from './pages/ProfilesPage';
 
 function RequireAuth() {
   const token = localStorage.getItem('token');
@@ -40,6 +42,12 @@ function Layout() {
               </NavLink>
               <NavLink to="/categories" className={linkClass}>
                 <Tags size={14} /> Categories
+              </NavLink>
+              <NavLink to="/resources" className={linkClass}>
+                <Database size={14} /> Resources
+              </NavLink>
+              <NavLink to="/profiles" className={linkClass}>
+                <Layers size={14} /> Profiles
               </NavLink>
             </nav>
           </div>
@@ -86,6 +94,8 @@ export default function App() {
               <Route path="/questions/new" element={<AskQuestionPage />} />
               <Route path="/questions/:questionId" element={<QuestionDetailPage />} />
               <Route path="/categories" element={<CategoriesPage />} />
+              <Route path="/resources" element={<ResourcesPage />} />
+              <Route path="/profiles" element={<ProfilesPage />} />
             </Route>
           </Route>
           <Route path="*" element={<Navigate to="/questions" replace />} />
