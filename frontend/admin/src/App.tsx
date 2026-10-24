@@ -5,6 +5,7 @@ import CoursesPage from './pages/CoursesPage';
 import RosterPage from './pages/RosterPage';
 import UsersPage from './pages/UsersPage';
 import UserDetailPage from './pages/UserDetailPage';
+import { ThemeToggle } from './components/ThemeToggle';
 
 function RequireAdmin() {
   const token = localStorage.getItem('token');
@@ -28,8 +29,9 @@ function AdminLayout() {
   return (
     <div className="flex min-h-screen">
       <aside className="w-56 shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col">
-        <div className="px-6 py-5 border-b border-slate-700">
+        <div className="px-6 py-5 border-b border-slate-700 flex items-center justify-between">
           <h1 className="text-lg font-bold text-white">QnA Admin</h1>
+          <ThemeToggle />
         </div>
         <nav className="flex-1 p-3 space-y-1">
           <NavLink to="/courses" className={linkClass}>

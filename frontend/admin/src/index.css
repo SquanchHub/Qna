@@ -1,3 +1,5 @@
+@import '../../shared/tokens.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -6,6 +8,11 @@
 
 body {
   margin: 0;
-  background: #0f172a;
-  color: #f8fafc;
+  background: rgb(var(--color-surface));
+  color: rgb(var(--color-text-primary));
+}
+
+:focus-visible {
+  outline: 2px solid rgb(var(--color-focus-ring));
+  outline-offset: 2px;
 }
