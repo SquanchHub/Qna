@@ -18,9 +18,28 @@ The root `package.json` runs all three with `npm run dev`.
   - There is no token refresh.
 - **API calls:** `lib/api.ts` wraps `fetch` with the `/api` base and a Bearer header. It throws an `Error` carrying the backend's `message` field.
 - **Styling:**
-  - Colors are hardcoded Tailwind palette classes (`slate-*`, `indigo-*`, `emerald-*`, `red-*`).
-  - There's a dark body background in `index.css`.
-  - There's no semantic token layer and no light theme. T8 replaces this in all three apps.
+  - Student and admin use the semantic token classes and have light and dark themes (see Theming below).
+  - Staff still uses hardcoded palette classes (`slate-*`, `indigo-*`, …) and a dark-only `index.css`. It moves to the tokens after `feature/staff-resources-ui` merges.
+
+## Theming
+
+- **Shared tokens:**
+  - `shared/tokens.css` is the one place that defines the light and dark color values: `surface`, `text-primary`, `accent`, `danger`, `ai` and the rest.
+  - It's the only file the apps share. Each app still has its own Tailwind color map, theme toggle and components.
+- **How an app uses it:**
+  - Each app's `src/index.css` starts with `@import '../../shared/tokens.css';`, placed before the `@tailwind` lines. Vite inlines the file at build time.
+  - `tailwind.config.ts` maps every token to a class such as `bg-surface-raised`, `text-muted` or `bg-danger/10`.
+  - Components use only these classes. Raw palette classes like `slate-*` are not allowed outside `tokens.css`.
+- **Root-build requirement:**
+  - The relative import only resolves when the build can see all of `frontend/`.
+  - `npm run build` from the repo root and the repo-root Docker build (`docker build -f nginx/Dockerfile .`) both can.
+  - Don't build an app in a context that contains only `frontend/<app>`, such as a per-app Dockerfile.
+- **Choosing a theme:**
+  - An inline script in each `index.html` sets `data-theme` on `<html>` before first paint. It uses `localStorage.theme` if set, or the OS `prefers-color-scheme` otherwise.
+  - The toggle writes the same key.
+- **Contrast:**
+  - `python scripts/check_contrast.py` parses `tokens.css` and checks every text/background pair against WCAG AA in both themes. Body text must reach 4.5:1, and borders and focus rings 3:1.
+  - Rerun it after changing any value.
 
 ## Where the RAG feature touches the frontend
 
