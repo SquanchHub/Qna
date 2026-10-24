@@ -155,12 +155,12 @@ export default function ProfilesPage() {
 
   return (
     <div className="p-8 max-w-3xl mx-auto">
-      <h2 className="text-2xl font-bold text-slate-100 mb-6">Ingestion Profiles</h2>
+      <h2 className="text-2xl font-bold text-primary mb-6">Ingestion Profiles</h2>
 
       <Card className="mb-6">
         <CardHeader>
-          <h3 className="text-lg font-semibold text-slate-100">Create from preset</h3>
-          <p className="text-slate-400 text-sm">
+          <h3 className="text-lg font-semibold text-primary">Create from preset</h3>
+          <p className="text-muted text-sm">
             Profiles never change. To try another configuration, create another profile.
           </p>
         </CardHeader>
@@ -174,14 +174,14 @@ export default function ProfilesPage() {
               ))}
             </Select>
             {selectedPreset && (
-              <p className="text-slate-400 text-xs">{describeChunking(selectedPreset.chunking)}</p>
+              <p className="text-muted text-xs">{describeChunking(selectedPreset.chunking)}</p>
             )}
             <Input
               placeholder={preset ? `Name (defaults to ${preset})` : 'Name (optional)'}
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            {error && <p className="text-red-400 text-sm">{error}</p>}
+            {error && <p className="text-danger text-sm">{error}</p>}
             <Button type="submit" disabled={saving || !preset}>
               <span className="flex items-center gap-1.5">
                 <Plus size={16} /> {saving ? 'Creating…' : 'Create'}
@@ -191,22 +191,22 @@ export default function ProfilesPage() {
         </CardContent>
       </Card>
 
-      {actionError && <p className="text-red-400 text-sm mb-4">{actionError}</p>}
+      {actionError && <p className="text-danger text-sm mb-4">{actionError}</p>}
 
       <div className="space-y-3 mb-6">
         {profiles.map((p) => (
           <Card key={p.id} className="px-6 py-4 flex items-start justify-between gap-4">
             <div className="min-w-0 space-y-1">
-              <p className="flex items-center gap-2 font-semibold text-slate-100">
+              <p className="flex items-center gap-2 font-semibold text-primary">
                 {p.name}
                 {p.name !== p.preset && <Badge variant="outline">{p.preset}</Badge>}
                 {p.active_job_id !== null && <Badge variant="info">Syncing</Badge>}
               </p>
-              <p className="text-slate-400 text-sm break-all">{p.embedding_model}</p>
-              <p className="text-slate-400 text-sm">
+              <p className="text-muted text-sm break-all">{p.embedding_model}</p>
+              <p className="text-muted text-sm">
                 {p.chunk_count} chunks · {p.collection_name} · created {formatTimestamp(p.created_at)}
               </p>
-              <p className="text-slate-500 text-xs">{describeChunking(p.chunking)}</p>
+              <p className="text-muted text-xs">{describeChunking(p.chunking)}</p>
             </div>
             <div className="flex shrink-0 gap-2">
               <Button
@@ -232,18 +232,18 @@ export default function ProfilesPage() {
             </div>
           </Card>
         ))}
-        {profiles.length === 0 && <p className="text-slate-500 text-sm">No profiles yet.</p>}
+        {profiles.length === 0 && <p className="text-muted text-sm">No profiles yet.</p>}
       </div>
 
       <Card>
         <CardHeader className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-slate-100">Service health</h3>
+          <h3 className="text-lg font-semibold text-primary">Service health</h3>
           <Button variant="ghost" size="sm" onClick={() => void loadHealth()}>
             <RefreshCw size={14} />
           </Button>
         </CardHeader>
         <CardContent>
-          {healthError && <p className="text-red-400 text-sm">{healthError}</p>}
+          {healthError && <p className="text-danger text-sm">{healthError}</p>}
           {health && (
             <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
               <HealthRow label="Ollama" ok={health.ollama.ok} detail={health.ollama.models.join(', ')} />
@@ -270,8 +270,8 @@ export default function ProfilesPage() {
                 downText="off"
                 downVariant="outline"
               />
-              <dt className="text-slate-400">Defaults</dt>
-              <dd className="text-slate-300 break-all">
+              <dt className="text-muted">Defaults</dt>
+              <dd className="text-secondary break-all">
                 {health.defaults.profile} · threshold {health.defaults.threshold} ·{' '}
                 {health.defaults.model}
               </dd>
@@ -301,8 +301,8 @@ function HealthRow({
 }) {
   return (
     <>
-      <dt className="text-slate-400">{label}</dt>
-      <dd className="flex flex-wrap items-center gap-2 text-slate-300">
+      <dt className="text-muted">{label}</dt>
+      <dd className="flex flex-wrap items-center gap-2 text-secondary">
         <Badge variant={ok ? 'success' : downVariant}>{ok ? okText : downText}</Badge>
         {detail && <span className="break-all">{detail}</span>}
       </dd>

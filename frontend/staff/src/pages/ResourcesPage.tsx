@@ -205,13 +205,13 @@ export default function ResourcesPage() {
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
-      <h2 className="text-2xl font-bold text-slate-100 mb-6">Resources</h2>
-      {loadError && <p className="text-red-400 text-sm mb-4">{loadError}</p>}
+      <h2 className="text-2xl font-bold text-primary mb-6">Resources</h2>
+      {loadError && <p className="text-danger text-sm mb-4">{loadError}</p>}
 
       <div className="grid gap-6 md:grid-cols-2 mb-6">
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-slate-100">Register URL</h3>
+            <h3 className="text-lg font-semibold text-primary">Register URL</h3>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleRegister} className="space-y-3">
@@ -253,7 +253,7 @@ export default function ResourcesPage() {
                   />
                 </>
               )}
-              {urlError && <p className="text-red-400 text-sm">{urlError}</p>}
+              {urlError && <p className="text-danger text-sm">{urlError}</p>}
               <Button type="submit" disabled={registering}>
                 <span className="flex items-center gap-1.5">
                   <Link2 size={16} /> {registering ? 'Registering…' : 'Register'}
@@ -265,8 +265,8 @@ export default function ResourcesPage() {
 
         <Card>
           <CardHeader>
-            <h3 className="text-lg font-semibold text-slate-100">Upload file</h3>
-            <p className="text-slate-400 text-sm">Fallback when the URL can't be fetched.</p>
+            <h3 className="text-lg font-semibold text-primary">Upload file</h3>
+            <p className="text-muted text-sm">Fallback when the URL can't be fetched.</p>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleUpload} className="space-y-3">
@@ -306,12 +306,12 @@ export default function ResourcesPage() {
                 {/* TODO(design §6): confirm with backend — how the base joins a single-file
                     upload's name, whether a trailing "/" is needed, and whether it applies to
                     .html uploads. Help text only; no client-side validation. */}
-                <p className="text-slate-400 text-xs mt-1">
+                <p className="text-muted text-xs mt-1">
                   Where students can view this content. For a zip, each file's path inside the
                   zip is appended. Without it, citations show as unlinked text.
                 </p>
               </div>
-              {uploadError && <p className="text-red-400 text-sm">{uploadError}</p>}
+              {uploadError && <p className="text-danger text-sm">{uploadError}</p>}
               <Button type="submit" disabled={uploading || !file}>
                 <span className="flex items-center gap-1.5">
                   <Upload size={16} /> {uploading ? 'Uploading…' : 'Upload'}
@@ -324,7 +324,7 @@ export default function ResourcesPage() {
 
       {created && (
         <Card className="mb-6 px-6 py-4 space-y-2">
-          <p className="text-slate-100">
+          <p className="text-primary">
             <span className="font-semibold">{created.title}</span> was added but hasn't been
             synced yet.
           </p>
@@ -338,12 +338,12 @@ export default function ResourcesPage() {
         </Card>
       )}
 
-      {actionError && <p className="text-red-400 text-sm mb-4">{actionError}</p>}
+      {actionError && <p className="text-danger text-sm mb-4">{actionError}</p>}
 
       <Card className="mb-6 overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="border-b border-slate-700 text-left text-slate-400">
+            <tr className="border-b border-border text-left text-muted">
               <th className="px-4 py-3 font-medium">Type</th>
               <th className="px-4 py-3 font-medium">Resource</th>
               <th className="px-4 py-3 font-medium">Profiles</th>
@@ -353,12 +353,12 @@ export default function ResourcesPage() {
           <tbody>
             {resources.map((r) => (
               <Fragment key={r.id}>
-                <tr className="border-b border-slate-700/60 align-top">
+                <tr className="border-b border-border/60 align-top">
                   <td className="px-4 py-3">
                     <Badge variant="outline">{TYPE_LABELS[r.resource_type]}</Badge>
                   </td>
                   <td className="px-4 py-3">
-                    <p className="font-semibold text-slate-100">{r.title}</p>
+                    <p className="font-semibold text-primary">{r.title}</p>
                     <ResourceSource resource={r} />
                   </td>
                   <td className="px-4 py-3">
@@ -378,10 +378,10 @@ export default function ResourcesPage() {
                           {s.profile_name}: {s.status} · {s.chunk_count}
                         </StatusBadge>
                       ))}
-                      {r.states.length === 0 && <span className="text-slate-500">No profiles</span>}
+                      {r.states.length === 0 && <span className="text-muted">No profiles</span>}
                     </div>
                     {latestSync(r) && (
-                      <p className="text-slate-500 text-xs mt-1">
+                      <p className="text-muted text-xs mt-1">
                         Last synced{' '}
                         {formatTimestamp(latestSync(r))}
                       </p>
@@ -413,7 +413,7 @@ export default function ResourcesPage() {
                   </td>
                 </tr>
                 {resyncId === r.id && (
-                  <tr className="border-b border-slate-700/60">
+                  <tr className="border-b border-border/60">
                     <td colSpan={4} className="px-4 py-3">
                       <SyncProfilesForm
                         profiles={profiles}
@@ -429,7 +429,7 @@ export default function ResourcesPage() {
             ))}
             {resources.length === 0 && (
               <tr>
-                <td colSpan={4} className="px-4 py-6 text-center text-slate-500">
+                <td colSpan={4} className="px-4 py-6 text-center text-muted">
                   No resources yet.
                 </td>
               </tr>
@@ -440,26 +440,26 @@ export default function ResourcesPage() {
 
       <Card>
         <CardHeader>
-          <h3 className="text-lg font-semibold text-slate-100">Recent jobs</h3>
+          <h3 className="text-lg font-semibold text-primary">Recent jobs</h3>
         </CardHeader>
         <CardContent className="space-y-2">
           {jobs.map((j) => (
             <div key={j.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
               <StatusBadge status={j.status} />
-              <span className="text-slate-100">
+              <span className="text-primary">
                 #{j.id} {j.profile_name}
               </span>
-              <span className="text-slate-400">{resourceTitle(j.resource_id)}</span>
-              <span className="text-slate-500">
+              <span className="text-muted">{resourceTitle(j.resource_id)}</span>
+              <span className="text-muted">
                 +{j.chunks_added} ~{j.chunks_updated} −{j.chunks_deleted}
               </span>
-              <span className="text-slate-500">
+              <span className="text-muted">
                 {formatTimestamp(j.finished_at ?? j.started_at ?? j.created_at)}
               </span>
-              {j.error && <span className="w-full text-red-400">{j.error}</span>}
+              {j.error && <span className="w-full text-danger">{j.error}</span>}
             </div>
           ))}
-          {jobs.length === 0 && <p className="text-slate-500 text-sm">No jobs yet.</p>}
+          {jobs.length === 0 && <p className="text-muted text-sm">No jobs yet.</p>}
         </CardContent>
       </Card>
     </div>
@@ -476,20 +476,20 @@ function latestSync(r: Resource): string | null {
 
 function ResourceSource({ resource: r }: { resource: Resource }) {
   if (r.source_kind === 'internal') {
-    return <p className="text-slate-400 text-xs">Resolved board threads</p>;
+    return <p className="text-muted text-xs">Resolved board threads</p>;
   }
   if (r.source_kind === 'upload') {
     return (
-      <p className="text-slate-400 text-xs break-all">
+      <p className="text-muted text-xs break-all">
         Uploaded: {r.original_filename ?? 'file'}
         {r.citation_base_url && <> · cites {r.citation_base_url}</>}
       </p>
     );
   }
   return (
-    <p className="text-slate-400 text-xs break-all">
+    <p className="text-muted text-xs break-all">
       {r.url && (
-        <a href={r.url} target="_blank" rel="noreferrer" className="hover:text-slate-200">
+        <a href={r.url} target="_blank" rel="noreferrer" className="hover:text-primary">
           {r.url}
         </a>
       )}
