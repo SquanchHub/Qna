@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Outlet, Route, Routes, useNavigate } from 'react-router-dom';
 import { LogOut, MessageSquare } from 'lucide-react';
 import { CourseProvider, useCourse } from './lib/CourseContext';
+import { ThemeToggle } from './components/ThemeToggle';
 import LoginPage from './pages/LoginPage';
 import QuestionsPage from './pages/QuestionsPage';
 import AskQuestionPage from './pages/AskQuestionPage';
@@ -47,6 +48,7 @@ function Layout() {
                 </select>
               </label>
             )}
+            <ThemeToggle />
             <button
               onClick={logout}
               className="flex items-center gap-1.5 text-sm text-slate-300 hover:text-slate-100"

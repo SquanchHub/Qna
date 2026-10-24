@@ -5,6 +5,7 @@ import { useCourse } from '../lib/CourseContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Card, CardContent, CardHeader } from '../components/ui/card';
+import { ThemeToggle } from '../components/ThemeToggle';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -54,7 +55,8 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-4">
+    <div className="relative min-h-screen flex items-center justify-center p-4">
+      <ThemeToggle className="absolute right-4 top-4" />
       <div className="w-full max-w-sm space-y-4">
         <Card>
           <CardHeader>
