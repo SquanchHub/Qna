@@ -13,7 +13,7 @@ for asking questions and taking part in threads.
 ```
 src/
   main.tsx              React root
-  index.css             Tailwind layers + hardcoded dark body colors (#0f172a / #f8fafc)
+  index.css             imports ../../shared/tokens.css, Tailwind layers, token body colors, focus-visible ring
   App.tsx               Router, RequireAuth guard, Layout (header + course picker + logout)
   lib/
     api.ts              fetch wrapper: /api base, Bearer token from localStorage,
@@ -21,7 +21,8 @@ src/
     CourseContext.tsx   loads GET /courses/mine; current course id persisted in localStorage
     types.ts            TS mirrors of backend schemas (Category, QuestionSummary, Post, QuestionDetail, MyCourse)
     utils.ts            cn() = clsx + tailwind-merge
-  components/ui/        badge, button, card, input, textarea (raw slate/indigo/emerald palette classes)
+  components/ui/        badge (incl. `ai` variant), button, card, input, textarea — token classes only
+  components/ThemeToggle.tsx  light/dark toggle (header and login page); state in lib/theme.ts
   pages/
     LoginPage.tsx           username/password, or dev netid login → temp token → /auth/exchange-temp
     QuestionsPage.tsx       list with category/status/keyword filters
@@ -45,4 +46,4 @@ src/
 - **Auth storage:** the access token is kept in `localStorage.token`. There is no refresh logic. An expired token makes requests fail until the user logs in again.
 - **Rendering posts:** in `QuestionDetailPage`, each post shows the author name and a role badge. The badge logic is `author_role === 'STAFF' ? 'Course Staff' : 'Student'`, so any new role such as an AI author would be **mislabeled as "Student"** until this logic changes. Accepted posts get an emerald border and the label "Verified by staff". Post bodies are shown as plain text (`whitespace-pre-wrap`), with no markdown or link rendering.
 - **Freshness:** the thread is fetched once when the page opens and after the user posts. There is no polling. A background AI answer only appears after a reload or a refetch.
-- **Theming:** the colors are raw Tailwind palette utilities (`slate-*`, `indigo-*`, `emerald-*`). There is no token layer and no light theme (T8).
+- **Theming:** components use the semantic token classes from `tailwind.config.ts` (`bg-surface-raised`, `text-muted`, `bg-accent`, …), backed by `frontend/shared/tokens.css`. First visit follows the OS theme; the toggle persists the choice in `localStorage.theme`. See `frontend/README.md` → Theming.
