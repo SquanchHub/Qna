@@ -18,9 +18,8 @@ The root `package.json` runs all three with `npm run dev`.
   - There is no token refresh.
 - **API calls:** `lib/api.ts` wraps `fetch` with the `/api` base and a Bearer header. It throws an `Error` carrying the backend's `message` field.
 - **Styling:**
-  - Colors are hardcoded Tailwind palette classes (`slate-*`, `indigo-*`, `emerald-*`, `red-*`).
-  - There's a dark body background in `index.css`.
-  - There's no semantic token layer and no light theme. T8 replaces this in all three apps.
+  - Student and admin use the semantic token classes and have light and dark themes (see Theming below).
+  - Staff still uses hardcoded palette classes (`slate-*`, `indigo-*`, …) and a dark-only `index.css`. It moves to the tokens after `feature/staff-resources-ui` merges.
 
 ## Theming
 

@@ -23,14 +23,14 @@ function AdminLayout() {
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-      isActive ? 'bg-indigo-600 text-white' : 'text-slate-300 hover:bg-slate-700 hover:text-slate-100'
+      isActive ? 'bg-accent text-accent-contrast' : 'text-secondary hover:bg-surface-sunken hover:text-primary'
     }`;
 
   return (
     <div className="flex min-h-screen">
-      <aside className="w-56 shrink-0 bg-slate-900 border-r border-slate-700 flex flex-col">
-        <div className="px-6 py-5 border-b border-slate-700 flex items-center justify-between">
-          <h1 className="text-lg font-bold text-white">QnA Admin</h1>
+      <aside className="w-56 shrink-0 bg-surface-raised border-r border-border flex flex-col">
+        <div className="px-6 py-5 border-b border-border flex items-center justify-between">
+          <h1 className="text-lg font-bold text-primary">QnA Admin</h1>
           <ThemeToggle />
         </div>
         <nav className="flex-1 p-3 space-y-1">
@@ -41,10 +41,10 @@ function AdminLayout() {
             <Users size={16} /> Users
           </NavLink>
         </nav>
-        <div className="p-3 border-t border-slate-700">
+        <div className="p-3 border-t border-border">
           <button
             onClick={logout}
-            className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-slate-300 hover:bg-slate-700 hover:text-slate-100 w-full transition-colors"
+            className="flex items-center gap-3 px-4 py-2.5 rounded-lg text-sm font-medium text-secondary hover:bg-surface-sunken hover:text-primary w-full transition-colors"
           >
             <LogOut size={16} /> Logout
           </button>

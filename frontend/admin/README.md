@@ -21,7 +21,9 @@ src/
     api.ts             fetch wrapper (Bearer token from localStorage); no X-App-Surface header;
                        adds postForm() for multipart CSV uploads
     utils.ts           cn()
-  components/ui/       badge, button, card, input, textarea
+    theme.ts           useTheme(): light/dark state, persisted in localStorage.theme
+  components/ui/       badge, button, card, input, textarea — token classes only
+  components/ThemeToggle.tsx  light/dark toggle (sidebar header and login page)
   pages/
     LoginPage.tsx        username/password only → localStorage.token
     CoursesPage.tsx      list/create/edit courses; "Roster" button per course
