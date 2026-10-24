@@ -1,0 +1,79 @@
+/*
+ * Semantic color tokens shared by the student, staff and admin apps (T8).
+ *
+ * Each app's index.css pulls this in with `@import '../../shared/tokens.css';`
+ * and Vite inlines it at build time. That relative import only resolves when
+ * the build can see all of frontend/, which the repo-root Docker build
+ * (nginx/Dockerfile) and `npm run build` both provide. Building one app from
+ * frontend/<app> as the root on its own will break it.
+ *
+ * Values are bare RGB channels so Tailwind can apply alpha modifiers:
+ * each app's tailwind.config.ts maps them as `rgb(var(--color-x) / <alpha-value>)`.
+ *
+ * WCAG AA contrast for every pair is checked by scripts/check_contrast.py,
+ * which parses this file. Rerun it after changing any value.
+ */
+
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --color-surface: 248 250 252;        /* #f8fafc */
+  --color-surface-raised: 255 255 255; /* #ffffff */
+  --color-surface-sunken: 241 245 249; /* #f1f5f9 */
+  --color-border: 203 213 225;         /* #cbd5e1  decorative: cards, dividers */
+  --color-border-strong: 116 134 155;  /* #74869b  inputs, outline buttons (3:1) */
+  --color-text-primary: 15 23 42;      /* #0f172a */
+  --color-text-secondary: 51 65 85;    /* #334155 */
+  --color-text-muted: 85 98 117;       /* #556275 */
+  --color-accent: 67 56 202;           /* #4338ca */
+  --color-accent-contrast: 255 255 255;/* #ffffff  text on accent and danger fills */
+  --color-danger: 185 28 28;           /* #b91c1c */
+  --color-success: 4 120 87;           /* #047857 */
+  --color-warning: 163 71 10;          /* #a3470a */
+  --color-info: 3 105 161;             /* #0369a1 */
+  --color-focus-ring: 79 70 229;       /* #4f46e5 */
+  --color-ai: 109 40 217;              /* #6d28d9  AI-generated badge */
+}
+
+/* No explicit choice yet (or no JS): follow the OS. Keep in sync with the block below. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --color-surface: 15 23 42;
+    --color-surface-raised: 30 41 59;
+    --color-surface-sunken: 11 17 32;
+    --color-border: 51 65 85;
+    --color-border-strong: 100 116 139;
+    --color-text-primary: 241 245 249;
+    --color-text-secondary: 203 213 225;
+    --color-text-muted: 148 163 184;
+    --color-accent: 165 180 252;
+    --color-accent-contrast: 15 23 42;
+    --color-danger: 252 165 165;
+    --color-success: 52 211 153;
+    --color-warning: 251 191 36;
+    --color-info: 56 189 248;
+    --color-focus-ring: 199 210 254;
+    --color-ai: 196 181 253;
+  }
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --color-surface: 15 23 42;           /* #0f172a */
+  --color-surface-raised: 30 41 59;    /* #1e293b */
+  --color-surface-sunken: 11 17 32;    /* #0b1120 */
+  --color-border: 51 65 85;            /* #334155 */
+  --color-border-strong: 100 116 139;  /* #64748b */
+  --color-text-primary: 241 245 249;   /* #f1f5f9 */
+  --color-text-secondary: 203 213 225; /* #cbd5e1 */
+  --color-text-muted: 148 163 184;     /* #94a3b8 */
+  --color-accent: 165 180 252;         /* #a5b4fc */
+  --color-accent-contrast: 15 23 42;   /* #0f172a */
+  --color-danger: 252 165 165;         /* #fca5a5 */
+  --color-success: 52 211 153;         /* #34d399 */
+  --color-warning: 251 191 36;         /* #fbbf24 */
+  --color-info: 56 189 248;            /* #38bdf8 */
+  --color-focus-ring: 199 210 254;     /* #c7d2fe */
+  --color-ai: 196 181 253;             /* #c4b5fd */
+}
