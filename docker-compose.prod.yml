@@ -1,10 +1,9 @@
-# Production stack for the GCP VM. The deploy job (.gitlab-ci.yml) copies this
-# file to /srv/app/docker-compose.yml and exports CI_REGISTRY_IMAGE and
-# IMAGE_TAG before `docker compose pull`. Secrets come from /srv/app/.env,
-# which lives only on the VM.
+# Production stack for the GCP VM. Runs the immutable images built and pushed
+# by CI; the deploy job exports CI_REGISTRY_IMAGE and IMAGE_TAG. Secrets come
+# from the .env file next to this file on the VM.
 #
-# TODO(T5): add ollama, infinity and chromadb here with named volumes and no
-# published ports (deployment_instructions.md, Part 7).
+# TODO(vzhou2, T5/T9): add ollama, infinity and chromadb with named volumes,
+# no published ports and mem_limit (design-rag.md §4.3.1; deployment Part 7).
 services:
   nginx:
     image: ${CI_REGISTRY_IMAGE}/nginx:${IMAGE_TAG}

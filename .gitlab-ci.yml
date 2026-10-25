@@ -85,16 +85,16 @@ deploy_full_stack:
     GITLAB_OIDC_TOKEN:
       aud: https://git.doit.wisc.edu
   variables:
-    # From Part 5 of deployment_instructions.md — none of these are secrets.
-    CLOUDSDK_CORE_PROJECT: qna-vzhou2
-    WIF_PROVIDER: projects/567940716281/locations/global/workloadIdentityPools/gitlab/providers/gitlab
-    DEPLOY_SA: gitlab-deployer@qna-vzhou2.iam.gserviceaccount.com
+    # From Part 5 — none of these are secrets
+    CLOUDSDK_CORE_PROJECT: qna-varikooty
+    WIF_PROVIDER: projects/93565696612/locations/global/workloadIdentityPools/gitlab/providers/gitlab
+    DEPLOY_SA: gitlab-deployer@qna-varikooty.iam.gserviceaccount.com
   before_script:
     - echo "$GITLAB_OIDC_TOKEN" > .oidc_token
     - gcloud iam workload-identity-pools create-cred-config "$WIF_PROVIDER" --service-account="$DEPLOY_SA" --credential-source-file=.oidc_token --output-file=.gcp_creds.json
     - gcloud auth login --cred-file=.gcp_creds.json
   script:
-    # docker-compose.prod.yml references the two images above by tag — copy it and the tag to the VM
+    # docker-compose.prod.yml (Part 7) references the two images above by tag — copy it and the tag to the VM
     - gcloud compute scp docker-compose.prod.yml production-web-server:docker-compose.yml --zone us-central1-a --tunnel-through-iap --quiet
     - >
       echo "$CI_REGISTRY_PASSWORD" | gcloud compute ssh production-web-server --zone us-central1-a --tunnel-through-iap --quiet --command "
