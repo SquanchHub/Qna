@@ -94,7 +94,7 @@ deploy_full_stack:
     - gcloud iam workload-identity-pools create-cred-config "$WIF_PROVIDER" --service-account="$DEPLOY_SA" --credential-source-file=.oidc_token --output-file=.gcp_creds.json
     - gcloud auth login --cred-file=.gcp_creds.json
   script:
-    # docker-compose.prod.yml references the two images above by tag — copy it and the tag to the VM
+    # docker-compose.prod.yml (Part 7) references the two images above by tag — copy it and the tag to the VM
     - gcloud compute scp docker-compose.prod.yml production-web-server:docker-compose.yml --zone us-central1-a --tunnel-through-iap --quiet
     - >
       echo "$CI_REGISTRY_PASSWORD" | gcloud compute ssh production-web-server --zone us-central1-a --tunnel-through-iap --quiet --command "
