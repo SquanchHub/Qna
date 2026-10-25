@@ -18,8 +18,7 @@ The root `package.json` runs all three with `npm run dev`.
   - There is no token refresh.
 - **API calls:** `lib/api.ts` wraps `fetch` with the `/api` base and a Bearer header. It throws an `Error` carrying the backend's `message` field.
 - **Styling:**
-  - Student and admin use the semantic token classes and have light and dark themes (see Theming below).
-  - Staff still uses hardcoded palette classes (`slate-*`, `indigo-*`, …) and a dark-only `index.css`. It moves to the tokens after `feature/staff-resources-ui` merges.
+  - All three apps use the semantic token classes and have light and dark themes (see Theming below).
 
 ## Theming
 
