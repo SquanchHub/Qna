@@ -21,6 +21,7 @@ here holds business logic.
   2. Anyone else must have a `UserCourseAccess` row for that course. If they don't, the response is **404 "Course not found"**, not 403, so course existence isn't leaked.
   3. The `X-App-Surface` header can only *clamp* the role. A value of `student` forces the effective role to `STUDENT`; any other value leaves the natural role. The Student app always sends `student`, so staff and admins acting there are treated as students.
 - **`require_course_staff`** builds on `require_course_member` and requires the effective role `STAFF` (403 otherwise).
+- **`require_rag_viewer`** guards global RAG routes such as `GET /api/rag/health`. It admits ADMIN, or a user with STAFF access in at least one course. The student surface gets 403 for everyone, and so does a user who is only a student.
 
 ### `exceptions.py`: the error model
 

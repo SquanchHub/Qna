@@ -65,6 +65,14 @@ Routers stay thin. Each one:
 
 Here, "member" means `require_course_member` and "staff" means `require_course_staff`. Both clamp to STUDENT when the request carries `X-App-Surface: student`.
 
+### `rag.py`: RAG routes (no prefix)
+
+| Method & path | Auth | Calls |
+|---|---|---|
+| `GET /rag/health` | `require_rag_viewer` | `services/rag/clients.py` probes, run concurrently |
+
+`GET /rag/health` reports `ok`, the served models and the Chroma versions for Ollama, Infinity and Chroma, plus `gitlab_token_configured`, `live_enabled` and the board defaults (design-rag.md §6). It never returns 5xx: a down service shows `ok: false`. Each request opens its own `httpx.AsyncClient` through the `get_rag_http` dependency, which tests override with a `MockTransport`. The course-scoped `/courses/{cid}/rag/*` routes arrive in later milestones.
+
 ## Things to know before extending
 
 - **Where new course-scoped RAG routes go:** in a new router module (for example `rag.py`), mounted in `main.py`. The routes are:
