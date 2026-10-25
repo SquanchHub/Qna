@@ -1,6 +1,6 @@
 # RAG Integration Test Plan
 
-Status: draft, no code yet. Owner: varikooty (`tests/integration/test_rag_*.py`, per `docs/schedule.md` and design §9). Spec under test: `docs/design-rag.md` (§6 API reference, plus §4.2, §4.4.5, §4.5 and §10 that §6 depends on). If this plan and the design disagree, the design wins; fix this plan.
+Status: implemented in `tests/integration/test_rag_*.py` (every case skips, naming its milestone, until that milestone is deployed). Owner: varikooty (`tests/integration/test_rag_*.py`, per `docs/schedule.md` and design §9). Spec under test: `docs/design-rag.md` (§6 API reference, plus §4.2, §4.4.5, §4.5 and §10 that §6 depends on). If this plan and the design disagree, the design wins; fix this plan.
 
 ---
 
@@ -159,8 +159,8 @@ The parametrized matrix covers every route in §6: `GET/POST /rag/profiles`, `DE
 | R1 | A new course already lists exactly one `historical_qa` resource (`source_kind: "internal"`). Listing twice creates no duplicate | — | M4 (created at M2/M4) |
 | R2 | `DELETE` historical Q&A resource | 409 `PROTECTED_RESOURCE` | M4 |
 | R3 | Upload `notes.md` as `repository` | 201, `states` shows each course profile as `NEVER`, `chunk_count: 0` | M4 |
-| R4 | Sync R3 to the profile → READY. `chunk_count > 0`. Compare on the Quindlewort question returns a `repo_markdown` chunk whose `source_url` is `upload://<rid>/notes.md?plain=1#L<a>-<b>`-shaped, or uses `citation_base_url` when it was given | — | M4 (compare: M5) |
-| R5 | Upload with `citation_base_url = "https://git.doit.wisc.edu/x/y/-/blob/<sha>/dir"`. The compare `source_url` starts with the base, includes `/notes.md?plain=1#L` | — | M5 |
+| R4 | Sync R3 to the profile → READY. `chunk_count > 0`. Compare on the Quindlewort question returns a `repo_markdown` chunk whose `source_url` is `upload://<rid>/notes.md#L<a>-<b>`-shaped (design §4.1.1 inserts `?plain=1` only for a GitLab `/-/blob/` base, so it is optional here), or uses `citation_base_url` when it was given | — | M4 (compare: M5) |
+| R5 | Upload `notes.md` with `citation_base_url = "https://git.doit.wisc.edu/x/y/-/blob/<sha>/dir/notes.md"` (for a single file the base is the file's URL; only a zip joins it with the in-zip path, design §4.1.1). The compare `source_url` starts with the base, includes `/notes.md?plain=1#L` | — | M5 |
 | R6 | Upload `repo.zip` and sync. Compare chunks include `repo_markdown` and `repo_pdf`. The PDF `source_url` contains `#page=` with the right 1-based page. The top dir is stripped from the path. The `.txt` is not ingested (its nonsense term never matches) | — | M5 |
 | R7 | Upload `syllabus.html` as `syllabus`. The matched chunk's `text` has no nav, sr-only or script text. `source_url` contains `#:~:text=` | — | M5 |
 | R8 | Unsafe uploads: zip-slip, symlink entry | 422 `UNSAFE_ARCHIVE` | M4 |

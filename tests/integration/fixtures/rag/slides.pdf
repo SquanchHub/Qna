@@ -1,0 +1,87 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [5 0 R 7 0 R 9 0 R] /Count 3 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Length 524 >>
+stream
+BT
+/F1 12 Tf
+16 TL
+72 720 Td
+(Brambleflux scheduling overview) Tj T*
+(The Brambleflux scheduler assigns each lecture task to a worker queue.) Tj T*
+(Queues are drained in priority order, and a task that waits longer) Tj T*
+(than its deadline is promoted one level so it cannot starve forever.) Tj T*
+(Workers report progress every few seconds so the scheduler can) Tj T*
+(rebalance load when one queue grows much longer than the others.) Tj T*
+(Summary: Brambleflux promotes waiting tasks instead of dropping them.) Tj T*
+ET
+endstream
+endobj
+5 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 4 0 R >>
+endobj
+6 0 obj
+<< /Length 513 >>
+stream
+BT
+/F1 12 Tf
+16 TL
+72 720 Td
+(Zorvatic caching rules) Tj T*
+(A Zorvatic cache keeps the most recent answer for each query key.) Tj T*
+(Entries expire after one hour, and any write to the underlying table) Tj T*
+(invalidates every cached entry that was computed from that table.) Tj T*
+(Readers that miss the cache recompute the value and store it again,) Tj T*
+(so a burst of misses after an invalidation is expected and harmless.) Tj T*
+(Summary: Zorvatic caches are invalidated by writes, not by size.) Tj T*
+ET
+endstream
+endobj
+7 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 6 0 R >>
+endobj
+8 0 obj
+<< /Length 520 >>
+stream
+BT
+/F1 12 Tf
+16 TL
+72 720 Td
+(Plimquist review checklist) Tj T*
+(Every Plimquist review checks naming, error handling and test coverage.) Tj T*
+(Reviewers leave one comment per issue and mark blocking issues clearly,) Tj T*
+(and the author must resolve every blocking comment before merging.) Tj T*
+(Non-blocking suggestions may be deferred to a follow-up change when) Tj T*
+(the author explains why in a reply on the merge request thread.) Tj T*
+(Summary: Plimquist reviews block merges only on marked issues.) Tj T*
+ET
+endstream
+endobj
+9 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Resources << /Font << /F1 3 0 R >> >> /Contents 8 0 R >>
+endobj
+xref
+0 10
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000127 00000 n 
+0000000197 00000 n 
+0000000772 00000 n 
+0000000898 00000 n 
+0000001462 00000 n 
+0000001588 00000 n 
+0000002159 00000 n 
+trailer
+<< /Size 10 /Root 1 0 R >>
+startxref
+2285
+%%EOF
