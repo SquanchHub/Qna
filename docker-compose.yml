@@ -29,11 +29,21 @@ services:
       - APP_ENV=development
     volumes:
       - ./backend:/app
+      # Outside /app, so --reload never restarts mid-ingest (design §4.3.2)
+      - uploads_data:/data/uploads
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
+      # service_started, not healthy: a cold Infinity can take 15 minutes, and
+      # GET /api/rag/health reports each service's state meanwhile
+      ollama:
+        condition: service_started
+      infinity:
+        condition: service_started
+      chroma:
+        condition: service_started
     networks:
       - qna_network
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
@@ -69,8 +79,92 @@ services:
       retries: 5
     command: redis-server --appendonly yes --appendfsync everysec --maxmemory 512mb --maxmemory-policy allkeys-lru
 
+  # --- RAG services (design-rag.md §4.3.1). Pinned versions, never latest. ---
+  # Model containers get explicit environment: entries, never env_file, so
+  # MySQL and GitLab secrets stay out of them.
+
+  ollama:
+    image: ollama/ollama:0.35.1
+    ports:
+      - "11434:11434"
+    environment:
+      OLLAMA_MAX_LOADED_MODELS: "1"
+      OLLAMA_NUM_PARALLEL: "1"
+      OLLAMA_KEEP_ALIVE: 10m
+    volumes:
+      - ollama_models:/root/.ollama
+    networks:
+      - qna_network
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # One-shot: pulls every model the board and eval/configs.json use, then exits.
+  # Models persist in ollama_models, so later runs only re-check them.
+  ollama-pull:
+    image: ollama/ollama:0.35.1
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["set -e; for m in $$OLLAMA_PULL_MODELS; do ollama pull $$m; done"]
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+      OLLAMA_PULL_MODELS: ${OLLAMA_PULL_MODELS:-qwen2.5:1.5b qwen2.5:3b}
+    restart: "no"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    networks:
+      - qna_network
+
+  infinity:
+    image: michaelf34/infinity:0.0.77-cpu
+    # The -cpu images are amd64 only; Apple silicon runs this under emulation
+    platform: linux/amd64
+    command: ["v2"]
+    ports:
+      - "7997:7997"
+    environment:
+      # One INFINITY_BATCH_SIZE entry per model, both ';'-separated
+      INFINITY_MODEL_ID: ${INFINITY_MODEL_ID:-sentence-transformers/all-MiniLM-L6-v2;BAAI/bge-small-en-v1.5;Alibaba-NLP/gte-Qwen2-1.5B-instruct;}
+      INFINITY_BATCH_SIZE: ${INFINITY_BATCH_SIZE:-32;32;4;}
+      INFINITY_ENGINE: torch
+      INFINITY_DEVICE: cpu
+      INFINITY_PORT: "7997"
+    volumes:
+      - infinity_cache:/app/.cache
+    networks:
+      - qna_network
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:7997/health', timeout=5)"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      # First start downloads every model (gte-Qwen2 is about 6 GB)
+      start_period: 900s
+
+  chroma:
+    # Must equal chromadb-client in backend/requirements.txt
+    image: chromadb/chroma:1.5.9
+    ports:
+      - "8001:8000"
+    volumes:
+      - chroma_data:/data
+    networks:
+      - qna_network
+    healthcheck:
+      # The image has bash but no curl, wget or python
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/localhost/8000; printf 'GET /api/v2/heartbeat HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3; head -1 <&3 | grep -q 200"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   mysql_data:
+  ollama_models:
+  infinity_cache:
+  chroma_data:
+  uploads_data:
 
 networks:
   qna_network:
