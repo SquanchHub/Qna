@@ -29,7 +29,7 @@ Routers stay thin. Each one:
 
 ### `admin.py` (`/api/admin`, every route requires `require_admin`)
 
-- **Courses:** `GET/POST /courses`, `GET/PUT /courses/{id}`.
+- **Courses:** `GET/POST /courses`, `GET/PUT /courses/{id}`. `POST` also adds the course's historical-Q&A resource.
 - **Roster:**
   - `GET /courses/{id}/roster`
   - `POST /courses/{id}/roster`: Canvas CSV upload, capped at 2 MB.
@@ -46,6 +46,7 @@ Routers stay thin. Each one:
 - **Access:**
   - `POST /users/{id}/course-access`: grants access, or changes the role if a grant already exists.
   - `DELETE /users/{id}/course-access/{course_id}`
+- **AI system user:** `PUT` and `DELETE /users/{id}` and both course-access routes return 409 `SYSTEM_ACCOUNT` for `qna-ai-assistant`. The check runs before any course or access lookup, and `UserCreate`/`UserUpdate` reject the name.
 
 ### `qa.py`: the course Q&A board (no prefix; paths start with `/courses`)
 

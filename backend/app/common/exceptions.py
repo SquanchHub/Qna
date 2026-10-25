@@ -37,11 +37,29 @@ class ConflictError(QnaError):
         super().__init__("CONFLICT", message, status.HTTP_409_CONFLICT)
 
 
+class SystemAccountError(QnaError):
+    """An admin tried to change the AI system user (design-rag.md §4.2)."""
+
+    def __init__(self, message: str = "The AI assistant is a system account"):
+        super().__init__("SYSTEM_ACCOUNT", message, status.HTTP_409_CONFLICT)
+
+
 class PayloadTooLargeError(QnaError):
     def __init__(self, message: str = "Payload too large"):
         super().__init__(
             "PAYLOAD_TOO_LARGE", message, status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
         )
+
+
+def validation_message(errors: list[dict]) -> str:
+    """One line for clients that show only `message`: the first error, with
+    its location minus the leading "body"/"query"/"path"."""
+    if not errors:
+        return "Invalid request"
+    first = errors[0]
+    loc = [str(part) for part in first.get("loc", ())[1:]]
+    msg = str(first.get("msg", "Invalid value"))
+    return f"{'.'.join(loc)}: {msg}" if loc else msg
 
 
 def register_exception_handlers(app: FastAPI) -> None:
@@ -69,7 +87,11 @@ def register_exception_handlers(app: FastAPI) -> None:
         logger.warning("validation_error", errors=errors, path=str(request.url))
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            content={"error": "VALIDATION_ERROR", "detail": errors},
+            content={
+                "error": "VALIDATION_ERROR",
+                "message": validation_message(errors),
+                "detail": errors,
+            },
         )
 
     @app.exception_handler(Exception)
