@@ -80,6 +80,13 @@ Runs in the FastAPI lifespan, from `main.py`.
 - `process_staff_csv` reads a CSV with `netid`, `full_name` and `email` columns, up to 200 rows.
 - For each row it creates the user if missing and grants or upgrades the user to **STAFF** immediately. It does not wait for the user to log in.
 
+### `rag/clients.py`
+
+Health probes for the RAG services, each bounded by `HEALTH_TIMEOUT_S` (3 s) and never raising:
+- **Ollama:** `GET /api/tags` returns the pulled models.
+- **Infinity:** `GET /health`, then `GET /models`, returns the served model ids.
+- **Chroma:** `GET /api/v2/heartbeat`, then `/api/v2/version`. That endpoint returns the API version (`"1.0.0"`), not the server release, so it is reported but not compared with the `chromadb-client` version. The matching pins in `docker-compose.yml` and `requirements.txt` guard against skew instead.
+
 ## Things to know before extending
 
 - Historical Q&A ingestion can query `Question` and `Post` directly. "Accepted" is `Post.is_accepted`; "closed" is `Question.status == "CLOSED"`.
