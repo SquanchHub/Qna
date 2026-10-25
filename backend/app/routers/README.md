@@ -71,16 +71,18 @@ Here, "member" means `require_course_member` and "staff" means `require_course_s
 | Method & path | Auth | Calls |
 |---|---|---|
 | `GET /rag/health` | `require_rag_viewer` | `services/rag/clients.py` probes, run concurrently |
+| `/courses/{cid}/rag/presets`, `/profiles`, `/resources`, `/jobs` | `require_course_staff` | `services/rag/catalog.py` |
 
-`GET /rag/health` reports `ok`, the served models and the Chroma versions for Ollama, Infinity and Chroma, plus `gitlab_token_configured`, `live_enabled` and the board defaults (design-rag.md §6). It never returns 5xx: a down service shows `ok: false`. Each request opens its own `httpx.AsyncClient` through the `get_rag_http` dependency, which tests override with a `MockTransport`. The course-scoped `/courses/{cid}/rag/*` routes arrive in later milestones.
+`GET /rag/health` reports `ok`, the served models and the Chroma versions for Ollama, Infinity and Chroma, plus `gitlab_token_configured`, `live_enabled`, the board defaults and the upload `limits` (design-rag.md §6). It never returns 5xx: a down service shows `ok: false`. Each request opens its own `httpx.AsyncClient` through the `get_rag_http` dependency, which tests override with a `MockTransport`.
+
+The course routes follow the design §6 table. Three things about them are easy to miss:
+- **Explicit commits.** Job creation and the two DELETEs run under `JOB_CREATE_LOCK` and commit inside it, so "one active job per profile" holds across concurrent requests. The sync routes call `schedule_job` only after that commit, because the background job opens its own session and must see the row.
+- **Upload directory.** `DELETE /resources/{rid}` removes the upload directory only after the row is committed. The upload route removes a file it just wrote if its commit fails.
+- **No PATCH or PUT.** Profiles are changed by deleting and re-creating them, so Starlette answers 405 on the profile path.
 
 ## Things to know before extending
 
-- **Where new course-scoped RAG routes go:** in a new router module (for example `rag.py`), mounted in `main.py`. The routes are:
-  - resource registration;
-  - re-sync;
-  - ingestion profiles;
-  - `POST /courses/{course_id}/rag/compare`.
+- **`POST /courses/{course_id}/rag/compare` (M5)** goes in `rag.py` beside the other course routes.
 - **Auth for staff routes:** staff-only routes depend on `require_course_staff`. That covers staff and global admin, which is what `/rag/compare` needs.
 - **Hooking in the AI answer:** `create_question` is the natural trigger point. It commits and then returns the thread, so an AI answer generated in the background after that commit doesn't block the student's request.
-- **File uploads:** the only uploads today are the admin CSV endpoints, which use `UploadFile` and `read_upload_capped`.
+- **File uploads:** the admin CSV endpoints and `POST /rag/resources/upload` use `UploadFile` and `read_upload_capped`.

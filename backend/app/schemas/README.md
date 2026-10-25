@@ -53,6 +53,16 @@ Used by `routers/qa.py`.
 - **`AuthorSummary`:** `{id, display_name}`, embedded in questions and posts.
 - **`MyCourseResponse`:** used by the course picker (`GET /courses/mine`).
 
+### `rag.py`
+
+- Requests are all `extra="forbid"`:
+  - `ProfileCreate`: `preset`, plus an optional `name` matching the profile-name pattern.
+  - `ResourceRegister`: validates the http(s) URL, rejects repository-only fields on other resource types, and rejects SHA, option-like and malformed `git_ref` values and `..`, absolute or backslash `subpath` values. It also normalises `subpath`.
+  - `ResourceSync`: `profile_ids` must have at least one entry when given, and duplicates are dropped.
+  - `EmptyBody`.
+- Responses are dicts built by `services/rag/catalog.py`. Their shape depends on the course's profiles: every resource lists a state per profile.
+- `utc_z` formats every RAG timestamp as `…Z`.
+
 ## Things to know before extending
 
 - `PostResponse` has no field that could carry citations or an "AI-generated" marker. Clients only see what is listed here, so new post metadata needs new fields in this file and in `qa_service.serialize_post`.

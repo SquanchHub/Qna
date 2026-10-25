@@ -83,7 +83,10 @@ async def test_all_services_up(health_client):
     r = await health_client()
     assert r.status_code == 200
     body = r.json()
-    assert set(body) == {"ollama", "infinity", "chroma", "gitlab_token_configured", "live_enabled", "defaults"}
+    assert set(body) == {
+        "ollama", "infinity", "chroma", "gitlab_token_configured", "live_enabled", "defaults", "limits"
+    }
+    assert body["limits"] == {"max_upload_mb": settings.MAX_UPLOAD_MB, "max_zip_mb": settings.MAX_ZIP_MB}
     assert body["ollama"] == {"ok": True, "models": ["qwen2.5:1.5b", "qwen2.5:3b"]}
     assert body["infinity"] == {
         "ok": True,
