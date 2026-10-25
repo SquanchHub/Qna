@@ -1,6 +1,6 @@
 # RAG Auto-Responder: Design
 
-Status: revised after the Goldfish review (§13). Owners: vzhou2 (core backend, deploy), varikooty (Compose services, chunking, frontend, integration tests); see `docs/schedule.md`. This is the authoritative spec for T4–T7; if implementation proves it wrong, update this document first, then the code.
+Status: revised after the Goldfish review (§13) and the metrics review (§14). Owners: vzhou2 (core backend, deploy), varikooty (Compose services, chunking, frontend, integration tests); see `docs/schedule.md`. This is the authoritative spec for T4–T7; if implementation proves it wrong, update this document first, then the code.
 
 ---
 
@@ -194,7 +194,7 @@ answer_job.run(question_id):
 
 **Restarts.** Exactly one uvicorn worker: dev runs `--reload` (`docker-compose.yml:39`), which can't combine with `--workers`; prod (`deployment_instructions.md` Part 7) passes no `--workers`. A dev save kills in-flight jobs, so **at startup `bootstrap` sets every `PENDING` question to `FAILED`** (no re-enqueue: models may not be healthy yet), and sets `QUEUED`/`RUNNING` ingestion jobs and their states to `FAILED` ("interrupted by restart").
 
-**Decline detection** (live only, never compare). `is_decline` is true if the stripped answer starts with `INSUFFICIENT_CONTEXT`, or is < 400 characters and case-insensitively matches `does not contain enough information`, `doesn't contain enough information`, `not enough information`, `cannot answer`, `can't answer` or `no information about`. Initial list, to tune on observed outputs.
+**Decline detection** (live board only; never inside the compare endpoint, though `eval/summarize.py` reuses it offline, §11.3). `is_decline` (`services/rag/decline.py`, no imports) is true if the stripped answer starts with `INSUFFICIENT_CONTEXT`, or is < 400 characters and case-insensitively matches `does not contain enough information`, `doesn't contain enough information`, `not enough information`, `cannot answer`, `can't answer` or `no information about`. Initial list, to tune on observed outputs.
 
 #### 4.2.5 Acceptance, triage and frontend
 
@@ -317,9 +317,9 @@ Answer the question using only the tagged context below.
 Question: {question}
 ```
 
-Tag = the chunk's `resource_type`; in text and attributes `<`, `>`, `"` become `‹`, `›`, `'`. Ollama `POST /api/chat`, `stream: false`, options `temperature 0`, `seed 42`, `num_ctx 4096`, `num_predict 400`; `keep_alive` only via env.
+Tag = the chunk's `resource_type`; in text and attributes `<`, `>`, `"` become `‹`, `›`, `'`. Ollama `POST /api/chat`, `stream: false`, options `temperature 0`, `seed 42`, `num_ctx 4096`, `num_predict 300` (expected answers are 1–3 sentences; 400 only lengthened rambling answers and pushed 3b toward the 100 s timeout; frozen before calibration and the committed run); `keep_alive` only via env.
 
-**`num_ctx` budget (Qwen tokens):** system ≤ 200 + instructions and tags ≈ 150 + 4 chunks × ≤ 252 chunk tokens at up to ≈ 1.3× BPE ≈ 1310 + question (≤ 4000 chars) ≤ ≈ 1000 + `num_predict` 400 ≈ **3060 ≤ 4096**.
+**`num_ctx` budget (Qwen tokens):** system ≤ 200 + instructions and tags ≈ 150 + 4 chunks × ≤ 252 chunk tokens at up to ≈ 1.3× BPE ≈ 1310 + question (≤ 4000 chars) ≤ ≈ 1000 + `num_predict` 300 ≈ **2960 ≤ 4096**.
 
 #### 4.4.5 `POST /api/courses/{course_id}/rag/compare` (fixed contract)
 
@@ -561,7 +561,7 @@ Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_ro
 | `docker-compose.prod.yml`, `.gitlab-ci.yml` | C, M | Deploy (vzhou2) |
 | `tests/unit/test_chunking.py`, `test_citations.py`, `test_rag_misc.py` | C | §10 |
 | `tests/integration/test_rag_{access,ingestion,compare,board}.py`, `fixtures/rag/`, `requirements.txt` | C, M | §10 (+ `pymysql`) |
-| `eval/calibrate_threshold.py`, `eval/preflight.py`, `eval/configs.json`, `eval/report.{json,md}` | C | §11, T6 evidence |
+| `backend/app/services/rag/calibrate.py`, `backend/app/services/rag/decline.py`, `eval/calibration.json`, `eval/preflight.py`, `eval/summarize.py`, `eval/summary.md`, `eval/configs.json`, `eval/report.{json,md}` | C | §11, T6 evidence |
 
 ---
 
@@ -619,7 +619,17 @@ This departs from `eval/README.md`'s upload suggestion: same content and paths, 
 
 ### 11.2 Threshold calibration
 
-`eval/calibrate_threshold.py` runs compare on `sliding-window` at threshold 0.0 for all 14 questions, recording each top-1 raw score and whether top-K contains the expected source (substring rule, or thread title for q12/q13). With `L` = lowest top-1 score among in-scope hits and `P` = q14's top-1: `T = ceil_to_0.05((P + L) / 2)`, then **while `T ≤ P`: `T += 0.05`**, guaranteeing `T > P`; if `T > L`, report the in-scope questions lost. T becomes `RAG_DEFAULT_THRESHOLD` and `baseline.similarity_threshold`. **Caveat (stated in T10):** T is tuned on the same 14 questions it is graded on, so baseline no-match accuracy is optimistic.
+**Retrieval only, in the container.** `docker compose exec backend python -m app.services.rag.calibrate` (on the VM, after the deployment's ingestion and a passing preflight, since grading re-runs there) calls `retrieve(snap, q, 0.0)` (§4.4.3) directly for all 14 questions. It never calls compare: at threshold 0.0 every compare call matches and would generate, about 14 × 4 calls at 5–60 s on 4 vCPUs. It skips Ollama and the generation lock, writes nothing to MySQL or Chroma, and sees raw scores, not the response's 4-decimal rounding. Runtime is seconds per profile.
+
+**Rule.** For q01–q11 it records `E_q`, the highest raw score among the top-K chunks **from the expected source** (substring rule). The harness scores a hit only when an expected-source chunk survives the threshold, so a hit at T happens exactly when `E_q ≥ T`; the top-1 score, which may come from another file, is the wrong bound. `E_q` is undefined when no top-K chunk is from that source (a miss at any T). q12/q13 cannot score (§3.2), so their thread-title `E_q` is reported but excluded from `L`. With `L` = lowest defined `E_q` and `P` = q14's top-1, all arithmetic in integer hundredths (no float drift at step boundaries):
+- `T_min` = smallest 0.05 step `> P`; `T_margin` = smallest 0.05 step `≥ P + 0.05`; `T_mid` = `ceil_to_0.05((P + L) / 2)`.
+- `T = max(T_mid, T_margin)` if that loses no question `T_min` keeps; otherwise `T = T_min`, and the lost margin is recorded. The margin is worth having only when it is free: the course is frozen (§11.1) and scores on the same VM are stable.
+- No defined `E_q`: `T = T_margin`, logged as a failure to investigate before any run.
+- If `T > L`, list the in-scope questions lost.
+
+T becomes `baseline.similarity_threshold`, and `RAG_DEFAULT_THRESHOLD` in the VM `.env`, the local `.env` and `.env.template`, so the committed config and both environments agree. **Caveat (stated in T10):** T is tuned on the same 14 questions it is graded on, so baseline hit rate and no-match accuracy are both optimistic.
+
+**Threshold-free retrieval per profile.** The same pass runs for every ingested profile and writes `eval/calibration.json`: per profile, hit@K with no threshold, each question's `E_q`, and q14's top-1. One threshold across embedding models confounds the embedding axis (§4.4.6); this file shows whether a profile retrieves better or only scores on a different scale, and T10 cites it next to the harness result. It is supplementary evidence, never a substitute for `report.json`.
 
 ### 11.3 Planned `eval/configs.json` and preflight
 
@@ -636,7 +646,16 @@ Baseline: `sliding-window`, calibrated T, `BASELINE_GUARDRAIL` verbatim, `qwen2.
 | `system_prompt` | `live-board-prompt` | `LIVE_PROMPT` (§4.4.6), measuring what the live board actually uses |
 | `generation_model` | `qwen2.5-3b-size` | `"qwen2.5:3b"` (size within one family) |
 
-**Preflight.** `eval/preflight.py` reads `configs.json` with the harness's `HARNESS_`/`.env` resolution and checks that every `generation_model` is in `/api/rag/health` → `ollama.models`, every `ingestion_profile` is in `/rag/profiles` with `chunk_count > 0` and no active job, and `live_enabled` is false. Non-zero exit on failure; **never run the harness unless it passes.** Runtime: 14 × 10 = 140 calls at about 5–60 s, roughly 13–150 minutes (U7). Commit the report produced against the deployment, then re-enable `RAG_LIVE_ENABLED`.
+**Preflight.** `eval/preflight.py` reads `configs.json` with the harness's `HARNESS_`/`.env` resolution and checks that every `generation_model` is in `/api/rag/health` → `ollama.models`, every `ingestion_profile` is in `/rag/profiles` with `chunk_count > 0` and no active job, and `live_enabled` is false. Non-zero exit on failure; **never run the harness unless it passes.** Runtime: 14 × 10 = 140 calls at about 5–60 s, roughly 13–150 minutes (U7), plus seconds per profile for the retrieval-only calibration (§11.2). Commit the report produced against the deployment, then re-enable `RAG_LIVE_ENABLED`.
+
+**Derived metrics.** The harness reports only means and a q14-only no-match accuracy, so `eval/summarize.py` reads `report.json` (never re-queries) and writes `eval/summary.md` with, per run:
+- **Abstention rate**: `matched: false` out of 14, split into correct (q14) and **false abstentions** (in-scope questions left unanswered).
+- **Generation declines (heuristic)**: `matched: true` but the answer declines, by `is_decline` loaded by path from `backend/app/services/rag/decline.py`, a module with no imports, so the host script needs no backend settings. Each flagged row prints the phrase that matched, since a partial answer ("X is Y; I cannot answer Z") can trip it. The phrase list is frozen before the committed run. Reported apart from abstentions: a retrieval abstention and a model refusal fail differently.
+- **Median `generation_time_ms` over matched rows** and median `wall_clock_ms` over all rows, with the max beside them. Means are skewed both ways: abstained rows count as 0 ms, and with `OLLAMA_MAX_LOADED_MODELS=1` the first call after each model switch pays the load. The median absorbs the one cold call per run; the max still reports the load. The threshold runs match different question subsets, so their medians are also given **paired**, over questions matched in both that run and baseline.
+
+**No warm-up before the committed run.** Graders run the harness without preflight, so their first baseline call is cold; warming ours would make our committed max and mean look better than the re-run.
+
+**Choosing the winner.** Fixed before the run: a comparison beats baseline on retrieval only if its hit rate is higher **and** its no-match accuracy is not lower, so `threshold-permissive` cannot win by answering q14. No-match accuracy rests on one question and hit rate on 13 (at most 11 scorable, §3.2), so a one-question difference is called a tie in T10. Answer quality is judged by reading answers side by side (T6); the T10 ranking names the change with the largest quality gain and its cost in median generation time and CPU.
 
 ---
 
@@ -650,12 +669,12 @@ Baseline: `sliding-window`, calibrated T, `BASELINE_GUARDRAIL` verbatim, `qwen2.
 | U4 | Chroma persist path, heartbeat path, cosine config for the pinned version | Docs plus restart-persistence test (M1) |
 | U5 | GitLab `?plain=1#L`, `/-/raw/…#page=`, files API `last_commit_id`, Basic `oauth2:<token>` via `extraHeader` | Browser and curl with a project token (M4) |
 | U6 | `qwen2.5:1.5b`/`3b` tags match `/api/tags` names | `ollama pull` + `/api/tags` (M1) |
-| U7 | gte ingest time; 3b generation < 100 s on 4 vCPUs | Measure on VM (M6); if slow, `num_predict` 300 |
+| U7 | gte ingest time; 3b generation < 100 s on 4 vCPUs | Measure on VM (M6); if still slow, `num_predict` 200, decided before calibration |
 | U8 | Fragments from extracted text match real pages | Browser check of 5 citations (M5) |
 | U9 | httpx connecting to a pre-resolved IP with original `Host` and SNI | Unit test with a local TLS server (M4); else a custom transport |
 | U10 | MySQL container timezone is UTC | `SELECT @@global.time_zone, NOW()` (M2) |
 
-**Open risks.** (1) Prompt injection via historical Q&A: mitigated (§4.6), not eliminated. (2) Grading re-run aborts (missing model or profile, OOM, version skew, busy lock): preflight, `RAG_LIVE_ENABLED=false`, `mem_limit`, pinned versions, our own run on the VM after the last deploy. (3) Reproducibility drift: frozen course, temperature 0 with seed, T10 note. (4) One threshold confounds the embedding axis: accepted and stated. (5) Single-worker assumption. (6) No course-delete endpoint exists; one added later must drop `c{id}_p*` collections.
+**Open risks.** (1) Prompt injection via historical Q&A: mitigated (§4.6), not eliminated. (2) Grading re-run aborts (missing model or profile, OOM, version skew, busy lock): preflight, `RAG_LIVE_ENABLED=false`, `mem_limit`, pinned versions, our own run on the VM after the last deploy. (3) Reproducibility drift: frozen course, temperature 0 with seed, T10 note. (4) One threshold confounds the embedding axis: accepted and stated; `eval/calibration.json` separates retrieval quality from score scale (§11.2). (5) Single-worker assumption. (6) No course-delete endpoint exists; one added later must drop `c{id}_p*` collections.
 
 ---
 
@@ -699,3 +718,26 @@ A fresh agent reviewed only this document. Findings and changes:
 | N6 Duplicate `keep_alive` | Request option removed; env only | 4.4.4 |
 | N8 Historical-Q&A privacy | No private or anonymous questions; course-scoped | 2, 4.5.1 |
 | Length | Deduplicated §6/§4.4.5 and §8/§7; tightened §10 and prose throughout (≈ 12.6k → ≈ 9k words) | all |
+
+---
+
+## 14. Revision log after the metrics review (2026-10-25)
+
+Goal: maximize, and report credibly, the threshold value, abstention rate, baseline vs. best hit rate (and which change won), and median answer time. Proposed changes were checked by a fresh Goldfish agent against `eval/compare_harness.py`; changes it showed to harm the design elsewhere were reworked or dropped.
+
+| Change | Side effect found | Outcome | Section |
+|---|---|---|---|
+| Calibrate `L` on the expected source's best score `E_q`, not top-1 | None; matches the harness's hit rule exactly | **Kept** | 11.2 |
+| 0.05 margin above q14 | Could silently push T above `L`, trading hits for a margin the frozen course doesn't need | **Modified:** margin only when it loses no hit; otherwise `T_min`, recorded | 11.2 |
+| Calibration through `/rag/compare` at threshold 0.0 | Every call matches and generates: about 56 generation calls, up to an hour of VM CPU, needing the lock | **Modified:** retrieval-only `calibrate.py` in the backend container; no generation, no writes, raw scores | 11.2 |
+| Float `ceil_to_0.05` | `0.40 + 0.05 > 0.45` in floats loses a question | **Modified:** integer hundredths | 11.2 |
+| q12/q13 in `L` | Unscorable, yet could lower `L` | **Modified:** excluded from `L`, reported | 11.2 |
+| Calibrate on the VM | Committed config, VM env and local env could disagree | **Modified:** T written to all three, incl. `.env.template` (varikooty's file; coordinate) | 11.2 |
+| Threshold-free `eval/calibration.json` per profile | None once retrieval-only | **Kept** | 11.2, 12 |
+| `summarize.py`: abstention, false abstention, declines | `is_decline` miscounts partial answers; tuning after the run moves counts; importing the backend on the host pulls settings; contradicted "never compare" in §4.2.4 | **Modified:** heuristic label, matched phrase printed, list frozen, import-free `decline.py`, §4.2.4 reworded | 4.2.4, 11.3 |
+| Median generation time over matched rows | Threshold runs median over different subsets | **Modified:** paired medians added; max reported beside median | 11.3 |
+| Pre-declared winner rule | One-question differences on a 1- and 13-question denominator | **Kept**, ties declared | 11.3 |
+| `OLLAMA_KEEP_ALIVE=-1` for harness runs | Already `10m`, which covers back-to-back calls; load cost comes from model switches, not idling | **Dropped** | 4.3.1 |
+| Warm the model before the committed run | Graders' re-run starts cold, so our max/mean would not reproduce | **Dropped**, stated as a rule | 11.3 |
+| Raise `RAG_TOP_K` | Lifts every run equally (no comparison changes) and lengthens prompts | **Dropped** | 4.3.2 |
+| `num_predict` 400 → 300 | Changes answers, so must be fixed before the run; 200 risks truncating q09-length answers | **Kept at 300**, frozen; 200 only if U7 fails | 4.4.4, 12 |
