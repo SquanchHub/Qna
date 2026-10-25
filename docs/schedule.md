@@ -9,37 +9,45 @@
 
 ## Timeline
 
-Work is split by file so the two of us rarely edit the same files:
-- **vzhou2** owns all of deployment (the VM, `docker-compose.prod.yml`, `.gitlab-ci.yml`, `DEPLOYMENT_URL.txt`). In `backend/` they own the models, migrations, schemas, routers, `qa_service`, `bootstrap` and the RAG ingestion and pipeline services, plus the backend side of `eval/`.
-- **varikooty** owns `docker-compose.yml`, `.env.template`, the RAG service clients, tokenizer, chunkers and citation helpers (`backend/app/services/rag/{clients,tokens,chunking,citations}.py`) with their unit tests, `frontend/`, and `tests/integration/test_rag_*.py`.
+Work is split by file so the two of us never edit the same file:
+- **vzhou2** owns everything that makes RAG run: all of `backend/` (migration `002_rag`, models, schemas, routers, `config.py`, `requirements.txt`, `Dockerfile`, `qa_service`, `bootstrap`, and every module in `services/rag/`), `docker-compose.yml`, `.env.template`, the RAG services in `docker-compose.prod.yml`, `tests/unit/`, and `eval/` (calibration, preflight, `configs.json`, the harness run and its reports). vzhou2 also answers `docs/frontend-open-questions.md` by updating §6 of `docs/design-rag.md`.
+- **varikooty** owns `frontend/` (all three apps, including the RAG pages and AI-answer display), `tests/integration/` with its fixtures, `docs/test-plan-rag.md`, `docs/ui/`, and deployment: `.gitlab-ci.yml`, `DEPLOYMENT_URL.txt`, and the VM `production-web-server` in GCP project `qna-varikooty` (its `.env`, `main` → `production` deploys, seeding and model pulls).
 
-varikooty starts on 2026-10-23 with the pieces that depend on nothing else (Compose services and chunking), so his code lands first. The design doc fixes the API shapes, so the frontend can be built against them in parallel.
+`docker-compose.prod.yml` already holds varikooty's base stack; from now on only vzhou2 edits it (to add the RAG services), and varikooty reviews. If a backend change breaks an integration test because the contract in `docs/design-rag.md` §6 changed, vzhou2 updates the doc first and varikooty updates the test.
+
+### Done
+
+| Milestone | Tasks | Owner | Finished |
+|---|---|---|---|
+| Directory READMEs for `backend/app/*` and the three frontend apps | T3 | vzhou2 | 2026-10-19 |
+| `docs/design-rag.md` from the Elephant session, revised after the Goldfish review | T3 | vzhou2 | 2026-10-20 |
+| Shared semantic color tokens, contrast check, light/dark toggle in the student and admin apps, before/after screenshots in `docs/ui/` | T8 | varikooty | 2026-10-23 |
+| Staff Resources and Profiles pages, RAG API types and upload client (built against §6, before the backend exists), frontend open questions | T4 | varikooty | 2026-10-23 |
+| `build`/`deploy` CI stages, `docker-compose.prod.yml` base stack, VM with static IP, `DEPLOYMENT_URL.txt` (project `qna-varikooty`) | T9 | varikooty | 2026-10-24 |
+| RAG integration test plan and tests for access, ingestion, compare and the board (branch `test/rag-tests`, failing until the backend lands) | T7 | varikooty | 2026-10-24 |
+| Staff app theming (branch `feature/staff-theme`) | T8 | varikooty | 2026-10-24 |
+| Eval plan revised for threshold, abstention, hit-rate and median-time metrics | T3, T6 | vzhou2 | 2026-10-25 |
+
+### Remaining
 
 | Milestone | Tasks | Owner | Target date |
 |---|---|---|---|
-| Directory READMEs for `backend/app/*` and the three frontend apps written and verified | T3 | vzhou2 | 2026-10-19 |
-| `docs/design-rag.md` drafted in the Elephant session, including the API endpoints the frontend will call | T3 | vzhou2 | 2026-10-19 |
-| Goldfish test run and `docs/design-rag.md` revised | T3 | vzhou2 | 2026-10-20 |
-| `build` and `deploy` stages in `.gitlab-ci.yml` and `docker-compose.prod.yml` (deployment guide Parts 6–7) | T9 | vzhou2 | 2026-10-20 |
-| GCP credit and project `qna-vzhou2`, Workload Identity Federation, and the `deploy_full_stack` project ID/number filled in (Parts 1 and 5) | T9 | vzhou2 | 2026-10-20 |
-| VM `production-web-server` with static IP, Docker, OS Login and `/srv/app/.env` (Part 2) | T9 | vzhou2 | 2026-10-22 |
-| Ollama, Infinity and ChromaDB running in `docker-compose.yml`, model pulls, service clients and `GET /api/rag/health` | T5 | varikooty | 2026-10-24 |
-| Tokenizer, type-tailored chunkers and citation helpers, with unit tests passing on `eval/sample_data/` | T4 | varikooty | 2026-10-25 |
-| Migration `002_rag`, RAG models, system user, Q&A resource bootstrap and serializers | T4, T5 | vzhou2 | 2026-10-25 |
-| First `main` → `production` deploy verified (Part 8), RAG services added to `docker-compose.prod.yml`, `DEPLOYMENT_URL.txt` | T9 | vzhou2 | 2026-10-26 |
-| Fetchers, ingestion jobs, re-sync, and the profile and resource APIs | T4 | vzhou2 | 2026-10-27 |
-| Staff UI for registering resources by URL, the file-upload fallback, re-sync and ingestion profiles (`frontend/staff/`) | T4 | varikooty | 2026-10-27 |
-| Semantic color tokens, light/dark themes and a persistent toggle in all three apps | T8 | varikooty | 2026-10-28 |
-| RAG pipeline, `POST /api/courses/{course_id}/rag/compare` dry run, background answer job: retrieval, threshold, tagged prompt with guardrail, and a labeled, cited AI post | T5, T6 | vzhou2 | 2026-10-29 |
-| AI-answer label and citation links shown in the student and staff apps | T5, T8 | varikooty | 2026-10-29 |
-| Integration tests for ingestion, the pipeline and `/rag/compare`, including access-control cases | T7 | varikooty | 2026-10-30 |
-| Models pulled and `eval/sample_data/` ingested on the VM under every profile, `eval/configs.json` written, harness run against the deployment, report committed | T6 | both | 2026-10-31 |
-| Theme screenshots in `docs/ui/` | T8 | varikooty | 2026-10-31 |
-| Individual documents `docs/vzhou2.md` and `docs/varikooty.md` | T10 | both | 2026-11-01 |
+| Merge `test/rag-tests` and `feature/staff-theme`; first `main` → `production` deploy verified (Part 8; the VM currently does not respond) | T7, T8, T9 | varikooty | 2026-10-26 |
+| Ollama, Infinity and ChromaDB in `docker-compose.yml`, `.env.template`, model pulls, service clients and `GET /api/rag/health` | T5 | vzhou2 | 2026-10-26 |
+| Migration `002_rag`, RAG models, system user, Q&A resource bootstrap, serializers; answers to the frontend open questions in §6 | T4, T5 | vzhou2 | 2026-10-27 |
+| Tokenizer, type-tailored chunkers and citation helpers, with unit tests passing on `eval/sample_data/` | T4 | vzhou2 | 2026-10-27 |
+| Fetchers, ingestion jobs, re-sync, profile and resource APIs; `test_rag_ingestion` and `test_rag_access` green | T4, T7 | vzhou2 | 2026-10-28 |
+| Staff pages switched from mock JSON to the live API, open-question TODOs resolved | T4 | varikooty | 2026-10-28 |
+| RAG pipeline, `POST /api/courses/{course_id}/rag/compare` dry run, background answer job (retrieval, threshold, tagged prompt with guardrail, labeled and cited AI post); `test_rag_compare` and `test_rag_board` green | T5, T6, T7 | vzhou2 | 2026-10-29 |
+| AI-answer label, citation links and status polling in the student and staff apps; staff screenshots in `docs/ui/` | T5, T8 | varikooty | 2026-10-29 |
+| RAG services added to `docker-compose.prod.yml` with `mem_limit`; redeploy with the RAG stack; models pulled and course seeded on the VM | T5, T9 | vzhou2 (compose), varikooty (deploy, VM) | 2026-10-30 |
+| `sample_data/` ingested on the VM under every profile, threshold calibrated, `eval/configs.json`, preflight, harness run against the deployment, `report.*` and `summary.md` committed | T6 | vzhou2 | 2026-10-31 |
+| Integration tests re-run against the full stack; CI pipeline green on `main` | T2, T7 | varikooty | 2026-10-31 |
+| Individual documents `docs/vzhou2.md` and `docs/varikooty.md` | T10 | each | 2026-11-01 |
 
 ## Check-ins
 
 | Date | What we will review |
 |---|---|
-| 2026-10-23 | Design doc final; agree on API shapes and the file split above before varikooty starts coding; VM and pipeline credentials ready; move dates that have slipped |
-| 2026-10-25 | Compose services, chunkers and the migration merged; VM ready for the first deploy; what is left for ingestion, the pipeline, the compare endpoint, theming and tests |
+| 2026-10-27 | Compose services and migration merged; deploy working; answers to the frontend open questions; any contract change in §6 |
+| 2026-10-29 | Ingestion and compare passing the integration tests; frontend on the live API; plan for the VM eval run |
