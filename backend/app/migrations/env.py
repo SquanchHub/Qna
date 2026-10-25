@@ -10,10 +10,14 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 from app.models import (  # noqa: F401
     Category,
     Course,
+    CourseResource,
     CourseRoster,
+    IngestionJob,
+    IngestionProfile,
     Post,
     Question,
     QuestionCategory,
+    ResourceProfileState,
     User,
     UserCourseAccess,
 )

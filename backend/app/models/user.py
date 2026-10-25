@@ -14,6 +14,24 @@ if TYPE_CHECKING:
     from .qa import Post, Question
 
 
+# The RAG auto-responder's system user (design-rag.md §4.2): NULL password,
+# netid and email, so it can never log in; admins cannot change it.
+AI_USERNAME = "qna-ai-assistant"
+AI_DISPLAY_NAME = "QnA Assistant (AI)"
+
+
+def is_system_account(user: User) -> bool:
+    """The AI user as bootstrap makes it. A real account that took the name
+    before it was reserved is not one, so admins can still rename it."""
+    return (
+        user.username == AI_USERNAME
+        and user.password_hash is None
+        and user.netid is None
+        and user.email is None
+        and user.role == "USER"
+    )
+
+
 class User(Base):
     __tablename__ = "users"
 

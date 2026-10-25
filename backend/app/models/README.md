@@ -2,9 +2,10 @@
 
 SQLAlchemy 2.0 ORM models (declarative `Mapped[...]` style) for the whole
 database. Every model inherits `Base` from `backend/app/database.py`. The
-schema they describe is created by the single Alembic migration
-`backend/app/migrations/versions/001_initial_schema.py`. Changing a model
-here without adding a new migration does **not** change the database.
+schema they describe is created by the Alembic migrations in
+`backend/app/migrations/versions/`: `001_initial_schema.py`, then `002_rag.py`
+(RAG). Changing a model here without adding a new migration does **not**
+change the database.
 
 `__init__.py` re-exports every model so that `from app.models import X`
 works. Alembic's `env.py` also imports it to discover the metadata.
@@ -16,6 +17,7 @@ works. Alembic's `env.py` also imports it to discover the metadata.
 | `user.py` | `User` | `users` |
 | `course.py` | `Course`, `CourseRoster`, `UserCourseAccess` | `courses`, `course_rosters`, `user_course_access` |
 | `qa.py` | `Category`, `Question`, `QuestionCategory`, `Post` | `categories`, `questions`, `question_categories`, `posts` |
+| `rag.py` | `IngestionProfile`, `CourseResource`, `ResourceProfileState`, `IngestionJob` | `ingestion_profiles`, `course_resources`, `resource_profile_states`, `ingestion_jobs` |
 
 ## Entity summary
 
@@ -26,6 +28,7 @@ works. Alembic's `env.py` also imports it to discover the metadata.
     - `netid` for SSO and dev-login users, who have no password.
     - `username` + `password_hash` (bcrypt) for local accounts: admin, grader and staff-created accounts.
   - All identity columns are nullable and unique.
+  - `AI_USERNAME` (`qna-ai-assistant`) is the RAG system user. It has NULL password, netid and email, so it can't log in. Bootstrap creates it, admins get 409 `SYSTEM_ACCOUNT` for any change to it, and the name is reserved in `schemas/admin.py`.
 - **Course**: `name` and `semester`.
   - Owns its roster, access grants, categories and questions.
   - Every one of those relationships uses `cascade="all, delete-orphan"`.
@@ -45,17 +48,20 @@ works. Alembic's `env.py` also imports it to discover the metadata.
   - `closed_at` and `closed_by_user_id` record who closed it.
   - `posts` is ordered by `Post.created_at`.
   - There is an index on `(course_id, status)`.
+  - `ai_status` is the auto-responder's progress: `NONE`, `PENDING` and five terminal values (design-rag.md §4.2.3). It has a Python default as well as a server default, because async SQLAlchemy can't lazy-load a server default after a flush.
 - **Post**: one entry in a thread.
   - `kind`: `ANSWER` or `FOLLOWUP`. Only `ANSWER` posts can be accepted.
-  - `author_role`: `STUDENT` or `STAFF`. This is a **snapshot** of the author's effective course role at posting time, so badges don't change if access changes later.
+  - `author_role`: `STUDENT`, `STAFF` or `AI`. For humans this is a **snapshot** of the author's effective course role at posting time, so badges don't change if access changes later. `AI` is set only by the server, for posts by the AI system user.
+  - `citations` (JSON list), `ai_model` and `ai_profile`: set on AI posts only (design-rag.md §4.1.3). `ai_profile` isn't serialized.
   - `is_accepted`, `accepted_by_user_id`, `accepted_at`: at most one accepted post per question. The service layer enforces this, not a DB constraint.
   - `author_user_id`: a non-null foreign key to `users`.
 
 ## Things to know before extending
 
-- **`Post.author_user_id` is non-null.** Any automated author (for example an AI answer) must be either a real `users` row or a schema change that makes the column nullable.
-- **`post_author_role` is a MySQL `ENUM`.** Adding a value (for example `AI`) needs an Alembic migration that alters the column. Every reader that branches on `author_role` must also be updated:
-  - the frontend badge logic, which treats anything that isn't `STAFF` as "Student";
-  - `schemas/qa.py`.
-- There is no table for course resources, ingestion runs or chunk metadata yet. RAG work adds new models here.
+- **`Post.author_user_id` is non-null.** AI answers are authored by the AI system user, a real `users` row.
+- **MySQL `ENUM`s need hand-written migrations.** Autogenerate misses added values, as `002_rag.py` did for `AI`. Every reader that branches on `author_role` must also handle every value, including the frontend badge logic.
+- **RAG tables (`rag.py`).** These hold ingestion state only; chunks live in ChromaDB.
+  - Each profile's collection is `IngestionProfile.collection_name` (`c{course_id}_p{id}`).
+  - Each course has exactly one `historical_qa` resource, enforced by UNIQUE(`course_id`, `singleton_key`). It is created by `services/rag/resources.py` at bootstrap and on course creation.
+  - Course and profile deletes cascade in the database (`passive_deletes=True`).
 - Timestamps use `server_default=func.now()` (naive DB time). Service code sets `closed_at` and `accepted_at` with `datetime.now(timezone.utc)`.

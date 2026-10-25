@@ -201,8 +201,13 @@ def downgrade() -> None:
     op.drop_table("course_rosters")
     op.drop_table("courses")
     op.drop_table("users")
-    op.execute("DROP TYPE IF EXISTS post_kind")
-    op.execute("DROP TYPE IF EXISTS post_author_role")
-    op.execute("DROP TYPE IF EXISTS question_status")
-    op.execute("DROP TYPE IF EXISTS course_role")
-    op.execute("DROP TYPE IF EXISTS user_role")
+    # Named enum types exist only on PostgreSQL; MySQL ENUMs went with the tables
+    if op.get_bind().dialect.name == "postgresql":
+        for enum_type in (
+            "post_kind",
+            "post_author_role",
+            "question_status",
+            "course_role",
+            "user_role",
+        ):
+            op.execute(f"DROP TYPE IF EXISTS {enum_type}")
