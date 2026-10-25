@@ -212,19 +212,20 @@ Student and staff apps: `author_role === 'AI'` shows a violet **"AI-generated"**
 
 #### 4.3.1 Compose services
 
-The project name comes from `COMPOSE_PROJECT_NAME=qna-74` in `.env`, equal to today's default (directory name), so the existing `mysql_data` volume is kept; there is no top-level `name:`. Pin exact image versions, never `latest`.
+The project name comes from `COMPOSE_PROJECT_NAME` in `.env`, or the directory name when unset. On the dev laptop it is `qna74`, the name the existing `qna74_mysql_data` volume was created under. On the VM (`/srv/app`) it is `app`. `.env.template` leaves it commented out, so a VM `.env` rebuilt from the template never switches to an empty database. There is no top-level `name:`. Pin exact image versions, never `latest`; the pins below were chosen 2026-10-25, each at least two weeks old.
 
 | Service | Image and key settings | Port (internal / dev host) | Volume | Healthcheck |
 |---|---|---|---|---|
-| `ollama` | `ollama/ollama:<pinned>`; `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_KEEP_ALIVE=10m` | 11434 / 11434 | `ollama_models:/root/.ollama` | `ollama list` |
-| `ollama-pull` | same image, one-shot: `ollama pull` each of `$OLLAMA_PULL_MODELS` with `OLLAMA_HOST=http://ollama:11434`; `restart: "no"`; after `ollama` healthy | — | — | — |
-| `infinity` | `michaelf34/infinity:<x.y.z>-cpu` `v2`; `INFINITY_MODEL_ID`, `INFINITY_BATCH_SIZE`, `INFINITY_ENGINE=torch`, `INFINITY_DEVICE=cpu`, `INFINITY_PORT=7997` | 7997 / 7997 | `infinity_cache:/app/.cache` | `/health`, `start_period` 900 s (gte download ≈ 6 GB) |
-| `chroma` | `chromadb/chroma:<pinned>`, persistent | 8000 / 8001 | `chroma_data` | heartbeat |
+| `ollama` | `ollama/ollama:0.35.1`; `OLLAMA_MAX_LOADED_MODELS=1`, `OLLAMA_NUM_PARALLEL=1`, `OLLAMA_KEEP_ALIVE=10m` | 11434 / 11434 | `ollama_models:/root/.ollama` | `ollama list` |
+| `ollama-pull` | same image, entrypoint `/bin/sh -c`, one-shot: `set -e` and `ollama pull` each of `$OLLAMA_PULL_MODELS` (default `qwen2.5:1.5b qwen2.5:3b`) with `OLLAMA_HOST=http://ollama:11434`; `restart: "no"`; after `ollama` healthy | — | — | — |
+| `infinity` | `michaelf34/infinity:0.0.77-cpu` `v2`, `platform: linux/amd64` (no arm64 build; emulated on Apple silicon); `INFINITY_MODEL_ID`, `INFINITY_BATCH_SIZE`, `INFINITY_ENGINE=torch`, `INFINITY_DEVICE=cpu`, `INFINITY_PORT=7997` | 7997 / 7997 | `infinity_cache:/app/.cache` | `/health`, `start_period` 900 s (gte download ≈ 6 GB) |
+| `chroma` | `chromadb/chroma:1.5.9`, persistent | 8000 / 8001 | `chroma_data:/data` | `/api/v2/heartbeat` via bash `/dev/tcp` (no curl in the image) |
 | `backend` (changed) | `depends_on` the three (`service_started`); adds `uploads_data:/data/uploads` | | | |
 
 - **Models.** `INFINITY_MODEL_ID="sentence-transformers/all-MiniLM-L6-v2;BAAI/bge-small-en-v1.5;Alibaba-NLP/gte-Qwen2-1.5B-instruct;"`, `INFINITY_BATCH_SIZE="32;32;4;"`. Low-RAM laptops may drop gte locally.
-- **Pooling.** We never pass `--pooling-method` (Infinity offers only `mean`, `cls`, `auto`). The torch engine runs SentenceTransformers, which applies each model's `1_Pooling/config.json`: mean (MiniLM), CLS (bge), last-token (gte-Qwen2, `pooling_mode_lasttoken: true`, `trust_remote_code`). Outputs are L2-normalized. Verified at M1 (U2).
-- **Prod.** `docker-compose.prod.yml` (vzhou2) mirrors this, publishes only nginx 80, sets `APP_ENV=production`, `mem_limit` ≈ 9 GB (infinity) and 4 GB (ollama). The Dockerfile adds `git`. New requirements: `chromadb-client==<server version>`, `beautifulsoup4`, `lxml`, `pypdf`, `psutil`, `tokenizers`, `httpx` (runtime).
+- **Pooling.** We never pass `--pooling-method` (Infinity offers only `mean`, `cls`, `auto`). The torch engine runs SentenceTransformers, which applies each model's `1_Pooling/config.json`: mean (MiniLM), CLS (bge), last-token (gte-Qwen2, `pooling_mode_lasttoken: true`, `trust_remote_code`). Outputs are L2-normalized. Verified for gte at M6 on the VM (U2): it does not fit the 3.8 GB Docker VM on the dev laptop.
+- **Env isolation.** The model containers get explicit `environment:` entries, never `env_file: .env`, so MySQL and GitLab secrets stay out of them.
+- **Prod.** `docker-compose.prod.yml` (vzhou2) mirrors this, publishes only nginx 80, sets `APP_ENV=production`, `mem_limit` ≈ 9 GB (infinity) and 4 GB (ollama). The Dockerfile adds `git`. New requirements: `chromadb-client==1.5.9` and `httpx` (runtime) at M1; `beautifulsoup4`, `lxml`, `pypdf`, `psutil` and `tokenizers` with the milestones that use them.
 
 #### 4.3.2 Environment (`config.py`, `.env.template`); "initial" values are to tune
 
@@ -243,7 +244,7 @@ The project name comes from `COMPOSE_PROJECT_NAME=qna-74` in `.env`, equal to to
 | `UPLOAD_DIR`, `CLONE_TMP_DIR` | `/data/uploads`, `/tmp` | Outside `/app`, or `--reload` restarts mid-ingest |
 | `MAX_UPLOAD_MB`, `MAX_ZIP_MB`, `MAX_FETCH_MB` | `20`, `50`, `10` | Caps (nginx allows 50 MB) |
 | `OLLAMA_PULL_MODELS` (compose) | `qwen2.5:1.5b qwen2.5:3b` | Must include every model in `eval/configs.json` |
-| `COMPOSE_PROJECT_NAME` (compose) | `qna-74` | Project and volume namespace |
+| `COMPOSE_PROJECT_NAME` (compose) | unset (directory name) | Project and volume namespace; set only to match an existing `<project>_mysql_data` (`qna74` locally) |
 
 Existing `FRONTEND_URL` builds thread links; on the VM it is `http://<static-ip>`.
 
@@ -253,7 +254,7 @@ gte-Qwen2 fp32 ≈ 6.2 GB plus activations (bf16 ≈ 3.1 GB if usable, U3); Mini
 
 **Alternatives rejected.** Ollama embeddings (T5 requires Infinity; no pooling control). One Infinity per model (same memory, more config). Pulling from the backend (blurs "never pulls"). Embedded Chroma (tied to the reload-prone backend). **Dropping gte** (Goldfish suggestion; T6 requires that model).
 
-**Risks.** Slow first Infinity start (shown by `/api/rag/health`). Chroma client/server skew: pin both, log `chroma_version_mismatch` at error level. OOM if the runbook is ignored.
+**Risks.** Slow first Infinity start (shown by `/api/rag/health`). Chroma client/server skew: pin both to the same release (`1.5.9`). `/api/v2/version` returns the API version (`"1.0.0"`), not the release, so the backend cannot detect skew at runtime; `/api/rag/health` reports both strings and the pins are the guard (the planned `chroma_version_mismatch` log is dropped). OOM if the runbook is ignored.
 
 ---
 
@@ -529,7 +530,7 @@ Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_ro
 | `GET /rag/jobs?limit=20&status=` | `limit` 1–100 | 200 `[Job]`, newest first | 422 `VALIDATION_ERROR` |
 | `GET /rag/jobs/{jid}` | — | 200 `Job` | 404 `JOB_NOT_FOUND` |
 | `POST /rag/compare` | §4.4.5 | §4.4.5 | §4.4.5 |
-| `GET /api/rag/health` (global) | — | 200 `{"ollama": {ok, models}, "infinity": {ok, models}, "chroma": {ok, server_version, client_version}, "gitlab_token_configured", "live_enabled", "defaults": {profile, threshold, model}}`; never 5xx (down = `ok: false`) | 401; 403 unless ADMIN or STAFF in some course, and on the student surface |
+| `GET /api/rag/health` (global) | — | 200 `{"ollama": {ok, models}, "infinity": {ok, models}, "chroma": {ok, server_version, client_version}, "gitlab_token_configured", "live_enabled", "defaults": {profile, threshold, model}}`; never 5xx. Types: `ok` bool; `models` string[] (`[]` when down); `server_version` string (Chroma API version, e.g. `"1.0.0"`) or null when down; `client_version` string, never null; `gitlab_token_configured` and `live_enabled` bool; `defaults.threshold` number | 401; 403 unless ADMIN or STAFF in some course, and on the student surface |
 
 **Multi-profile sync is all-or-nothing:** if any target profile has an active job, 409 `JOB_RUNNING` and no jobs are created.
 
@@ -663,12 +664,12 @@ Baseline: `sliding-window`, calibrated T, `BASELINE_GUARDRAIL` verbatim, `qwen2.
 
 | # | Unverified item | Verification (milestone) |
 |---|---|---|
-| U1 | Infinity `/health`, `/models`, `POST /embeddings {model, input}` → `data[].embedding`; `;`-separated `INFINITY_MODEL_ID` | `/docs` and curl on the pinned image (M1) |
-| U2 | gte in Infinity uses last-token pooling (inferred from SentenceTransformers config) | Cosine vs a local SentenceTransformers encode > 0.999 (M1) |
-| U3 | bf16 for gte on e2 CPUs; real RAM | `docker stats` during ingest (M1/M6) |
-| U4 | Chroma persist path, heartbeat path, cosine config for the pinned version | Docs plus restart-persistence test (M1) |
+| U1 | Infinity `/health`, `/models`, `POST /embeddings {model, input}` → `data[].embedding`; `;`-separated `INFINITY_MODEL_ID` | **Verified 2026-10-25 on 0.0.77-cpu:** `/models` → `data[].id`; embeddings 384-d, L2 norm 1.0, for MiniLM and bge; `;`-separated ids with matching `INFINITY_BATCH_SIZE` |
+| U2 | gte in Infinity uses last-token pooling (inferred from SentenceTransformers config) | Cosine vs a local SentenceTransformers encode > 0.999 (M6 on the VM; gte does not fit locally) |
+| U3 | bf16 for gte on e2 CPUs; real RAM | `docker stats` during ingest (M6) |
+| U4 | Chroma persist path, heartbeat path, cosine config for the pinned version | **Verified 2026-10-25 on 1.5.9:** persist `/data`, `GET /api/v2/heartbeat`; `configuration: {hnsw: {space: cosine}}` accepted; a probe collection kept its count across `docker compose restart chroma` |
 | U5 | GitLab `?plain=1#L`, `/-/raw/…#page=`, files API `last_commit_id`, Basic `oauth2:<token>` via `extraHeader` | Browser and curl with a project token (M4) |
-| U6 | `qwen2.5:1.5b`/`3b` tags match `/api/tags` names | `ollama pull` + `/api/tags` (M1) |
+| U6 | `qwen2.5:1.5b`/`3b` tags match `/api/tags` names | **Verified 2026-10-25 on Ollama 0.35.1:** `/api/tags` names are exactly `qwen2.5:1.5b` and `qwen2.5:3b` |
 | U7 | gte ingest time; 3b generation < 100 s on 4 vCPUs | Measure on VM (M6); if still slow, `num_predict` 200, decided before calibration |
 | U8 | Fragments from extracted text match real pages | Browser check of 5 citations (M5) |
 | U9 | httpx connecting to a pre-resolved IP with original `Host` and SNI | Unit test with a local TLS server (M4); else a custom transport |
