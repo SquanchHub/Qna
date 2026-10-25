@@ -81,20 +81,20 @@ export default function QuestionDetailPage() {
     }
   }
 
-  if (!question) return <p className="p-8 text-slate-400">Loading…</p>;
+  if (!question) return <p className="p-8 text-muted">Loading…</p>;
 
   return (
     <div className="p-8 max-w-2xl mx-auto space-y-6">
       <Link
         to="/questions"
-        className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-100"
+        className="inline-flex items-center gap-1.5 text-sm text-muted hover:text-primary"
       >
         <ArrowLeft size={16} /> Back to Questions
       </Link>
       <Card>
         <CardContent className="pt-6">
           <div className="flex items-start justify-between gap-4">
-            <h2 className="text-xl font-bold text-slate-100">{question.title}</h2>
+            <h2 className="text-xl font-bold text-primary">{question.title}</h2>
             <div className="flex items-center gap-2">
               <Badge variant={question.status === 'OPEN' ? 'success' : 'outline'}>
                 {question.status}
@@ -112,8 +112,8 @@ export default function QuestionDetailPage() {
               </Button>
             </div>
           </div>
-          <p className="text-slate-400 text-sm mt-1">Asked by {question.author.display_name}</p>
-          <p className="text-slate-200 mt-4 whitespace-pre-wrap">{question.body}</p>
+          <p className="text-muted text-sm mt-1">Asked by {question.author.display_name}</p>
+          <p className="text-primary mt-4 whitespace-pre-wrap">{question.body}</p>
           <div className="flex gap-1.5 mt-4 flex-wrap">
             {question.categories.map((c) => (
               <Badge key={c.id}>{c.name}</Badge>
@@ -122,15 +122,15 @@ export default function QuestionDetailPage() {
         </CardContent>
       </Card>
 
-      {error && <p className="text-red-400 text-sm">{error}</p>}
+      {error && <p className="text-danger text-sm">{error}</p>}
 
       <div className="space-y-3">
         {question.posts.map((post) => (
-          <Card key={post.id} className={post.is_accepted ? 'border-emerald-500' : ''}>
+          <Card key={post.id} className={post.is_accepted ? 'border-success' : ''}>
             <CardContent className="pt-6">
               <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
                 <div className="flex items-center gap-2">
-                  <span className="font-semibold text-slate-100">{post.author.display_name}</span>
+                  <span className="font-semibold text-primary">{post.author.display_name}</span>
                   <Badge variant={post.author_role === 'STAFF' ? 'default' : 'outline'}>
                     {post.author_role === 'STAFF' ? 'Course Staff' : 'Student'}
                   </Badge>
@@ -150,7 +150,7 @@ export default function QuestionDetailPage() {
                   </Button>
                 )}
               </div>
-              <p className="text-slate-200 whitespace-pre-wrap">{post.body}</p>
+              <p className="text-primary whitespace-pre-wrap">{post.body}</p>
             </CardContent>
           </Card>
         ))}
@@ -166,8 +166,8 @@ export default function QuestionDetailPage() {
                   onClick={() => setKind('ANSWER')}
                   className={`rounded-lg px-3 py-1.5 text-sm border ${
                     kind === 'ANSWER'
-                      ? 'bg-indigo-600 border-indigo-600 text-white'
-                      : 'border-slate-600 text-slate-300'
+                      ? 'bg-accent border-accent text-accent-contrast'
+                      : 'border-border-strong text-secondary'
                   }`}
                 >
                   Answer
@@ -177,8 +177,8 @@ export default function QuestionDetailPage() {
                   onClick={() => setKind('FOLLOWUP')}
                   className={`rounded-lg px-3 py-1.5 text-sm border ${
                     kind === 'FOLLOWUP'
-                      ? 'bg-indigo-600 border-indigo-600 text-white'
-                      : 'border-slate-600 text-slate-300'
+                      ? 'bg-accent border-accent text-accent-contrast'
+                      : 'border-border-strong text-secondary'
                   }`}
                 >
                   Follow-up
@@ -198,7 +198,7 @@ export default function QuestionDetailPage() {
           </CardContent>
         </Card>
       ) : (
-        <p className="flex items-center gap-2 text-slate-500 text-sm">
+        <p className="flex items-center gap-2 text-muted text-sm">
           <Lock size={14} /> This thread is closed. Reopen it above to add more posts.
         </p>
       )}

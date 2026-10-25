@@ -25,9 +25,9 @@ export function SyncProfilesForm({
 
   if (profiles.length === 0) {
     return (
-      <p className="text-sm text-slate-400">
+      <p className="text-sm text-muted">
         No ingestion profiles yet.{' '}
-        <Link to="/profiles" className="text-indigo-400 hover:text-indigo-300">
+        <Link to="/profiles" className="text-accent hover:text-accent/80">
           Create one on the Profiles page
         </Link>{' '}
         before syncing.
@@ -52,12 +52,12 @@ export function SyncProfilesForm({
   return (
     <div className="flex flex-wrap items-center gap-3">
       {profiles.map((p) => (
-        <label key={p.id} className="flex items-center gap-1.5 text-sm text-slate-300">
+        <label key={p.id} className="flex items-center gap-1.5 text-sm text-secondary">
           <input
             type="checkbox"
             checked={selected.has(p.id)}
             onChange={() => toggle(p.id)}
-            className="accent-indigo-500"
+            className="accent-accent"
           />
           {p.name}
         </label>
