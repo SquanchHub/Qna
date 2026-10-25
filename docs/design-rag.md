@@ -1,6 +1,6 @@
 # RAG Auto-Responder: Design
 
-Status: revised after the Goldfish review (§13) and the metrics review (§14). Owners: vzhou2 (core backend, deploy), varikooty (Compose services, chunking, frontend, integration tests); see `docs/schedule.md`. This is the authoritative spec for T4–T7; if implementation proves it wrong, update this document first, then the code.
+Status: revised after the Goldfish review (§13) and the metrics review (§14). Owners: vzhou2 (all RAG backend, Compose services, eval), varikooty (frontend, integration tests, deployment); see `docs/schedule.md`. This is the authoritative spec for T4–T7; if implementation proves it wrong, update this document first, then the code.
 
 ---
 
@@ -558,7 +558,7 @@ Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_ro
 | `backend/app/routers/rag.py`, `main.py`, `routers/qa.py`, `routers/admin.py` | C, M | Routes; answer trigger; `SYSTEM_ACCOUNT` guards and Q&A resource on course create |
 | `backend/app/common/exceptions.py`, `config.py`, `requirements.txt`, `Dockerfile`, `*/README.md` | M | Errors, settings, deps, `git`, docs |
 | `docker-compose.yml`, `.env.template` | M | Services, volumes, variables |
-| `docker-compose.prod.yml`, `.gitlab-ci.yml` | C, M | Deploy (vzhou2) |
+| `docker-compose.prod.yml`, `.gitlab-ci.yml` | M | RAG services in prod compose (vzhou2); CI deploy and VM (varikooty) |
 | `tests/unit/test_chunking.py`, `test_citations.py`, `test_rag_misc.py` | C | §10 |
 | `tests/integration/test_rag_{access,ingestion,compare,board}.py`, `fixtures/rag/`, `requirements.txt` | C, M | §10 (+ `pymysql`) |
 | `backend/app/services/rag/calibrate.py`, `backend/app/services/rag/decline.py`, `eval/calibration.json`, `eval/preflight.py`, `eval/summarize.py`, `eval/summary.md`, `eval/configs.json`, `eval/report.{json,md}` | C | §11, T6 evidence |
@@ -567,19 +567,19 @@ Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_ro
 
 ## 9. Implementation order (test-first)
 
-Ownership per `docs/schedule.md`: vzhou2 owns deployment (VM, `docker-compose.prod.yml`, `.gitlab-ci.yml`) and the rest of `backend/` and backend `eval/`; varikooty owns `docker-compose.yml`, `.env.template`, `services/rag/{clients,tokens,chunking,citations}.py` and their unit tests, `frontend/`, `tests/integration/test_rag_*.py`. Each milestone starts with failing tests; `ruff check`, `ruff format --check` and `tsc --noEmit` pass before each MR.
+Ownership per `docs/schedule.md`: vzhou2 owns all of `backend/` (every `services/rag/` module), `docker-compose.yml`, `.env.template`, the RAG services in `docker-compose.prod.yml`, `tests/unit/` and `eval/`; varikooty owns `frontend/`, `tests/integration/`, `.gitlab-ci.yml`, `DEPLOYMENT_URL.txt` and the VM. Each milestone starts with failing tests; `ruff check`, `ruff format --check` and `tsc --noEmit` pass before each MR.
 
 | # | Milestone (owner) | Tests first | Done when |
 |---|---|---|---|
 | M0 | Goldfish revision; agree §6 at the 10-23 check-in (vzhou2) | — | Doc on `main` before code |
-| M1 | Compose services, pull, config, health, `git` (varikooty) | health cases (varikooty) | Health all `ok` with models |
+| M1 | Compose services, pull, config, health, `git` (vzhou2) | health cases (varikooty) | Health all `ok` with models |
 | M2 | Migration, models, system user, Q&A bootstrap, `ai_status`, serializers, admin guards (vzhou2) | serializer and decline unit tests | Clean upgrade; existing tests green |
-| M3 | Tokenizer, chunkers, citations (varikooty) | `test_chunking`, `test_citations` | Green on `eval/sample_data` |
+| M3 | Tokenizer, chunkers, citations (vzhou2) | `test_chunking`, `test_citations` | Green on `eval/sample_data` |
 | M4 | Fetchers, jobs, re-sync, profile/resource APIs (vzhou2) | `test_rag_ingestion` (varikooty) | Upload path and URL path both ingest |
 | M4f | Resources and Profiles pages, upload helper (varikooty) | manual vs §6 (mock JSON until M4) | Register, upload, sync, delete work |
 | M5 | Pipeline, compare, answer job, prompts, locks, metrics (vzhou2) | `test_rag_compare`, `test_rag_board` (varikooty) | Contract and dry-run green |
 | M5f | AI badge, sources, polling, `?course=` (varikooty) | manual e2e | Labeled, cited answer; accept works |
-| M6 | Prod compose, CI deploy, VM, seed, models (vzhou2) | `/api/health`, `/api/rag/health` on VM | Deployment up |
+| M6 | RAG services in prod compose (vzhou2); CI deploy, VM, seed, models (varikooty) | `/api/health`, `/api/rag/health` on VM | Deployment up |
 | M7 | Eval on the VM (both) | `eval/preflight.py` passes | Report committed from the deployment |
 
 ---
@@ -732,7 +732,7 @@ Goal: maximize, and report credibly, the threshold value, abstention rate, basel
 | Calibration through `/rag/compare` at threshold 0.0 | Every call matches and generates: about 56 generation calls, up to an hour of VM CPU, needing the lock | **Modified:** retrieval-only `calibrate.py` in the backend container; no generation, no writes, raw scores | 11.2 |
 | Float `ceil_to_0.05` | `0.40 + 0.05 > 0.45` in floats loses a question | **Modified:** integer hundredths | 11.2 |
 | q12/q13 in `L` | Unscorable, yet could lower `L` | **Modified:** excluded from `L`, reported | 11.2 |
-| Calibrate on the VM | Committed config, VM env and local env could disagree | **Modified:** T written to all three, incl. `.env.template` (varikooty's file; coordinate) | 11.2 |
+| Calibrate on the VM | Committed config, VM env and local env could disagree | **Modified:** T written to all three, incl. `.env.template` | 11.2 |
 | Threshold-free `eval/calibration.json` per profile | None once retrieval-only | **Kept** | 11.2, 12 |
 | `summarize.py`: abstention, false abstention, declines | `is_decline` miscounts partial answers; tuning after the run moves counts; importing the backend on the host pulls settings; contradicted "never compare" in §4.2.4 | **Modified:** heuristic label, matched phrase printed, list frozen, import-free `decline.py`, §4.2.4 reworded | 4.2.4, 11.3 |
 | Median generation time over matched rows | Threshold runs median over different subsets | **Modified:** paired medians added; max reported beside median | 11.3 |
