@@ -245,11 +245,16 @@ class TestAutoResponder:
         assert len(_ai_posts(_detail(base_url, board_course, answered_question[0]["id"]))) == 1
 
     def test_b12_decline_posts_nothing(self, base_url, board_course):
-        """Best effort: whether the model declines can't be forced from outside (plan §6 item 6)."""
+        """Best effort: whether retrieval reaches the threshold and the model then
+        declines can't be forced from outside (plan §6 item 6)."""
         q = _ask(base_url, board_course, "What is the Quindlewort protocol's patent number?")
         detail = wait_for_ai_status(base_url, board_course.id, board_course.staff_token, q["id"])
         if detail["ai_status"] == "ANSWERED":
             pytest.skip(f"inconclusive: the model answered instead of declining: {_ai_posts(detail)[0]['body'][:300]!r}")
+        if detail["ai_status"] == "NO_MATCH":
+            # Also posts nothing (design §4.2.3), but never reached the model
+            assert detail["posts"] == []
+            pytest.skip("inconclusive: nothing reached the threshold, so the model never ran")
         assert detail["ai_status"] == "DECLINED", detail["ai_status"]
         assert detail["posts"] == []
 

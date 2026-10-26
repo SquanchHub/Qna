@@ -49,7 +49,8 @@ export interface ChunkingConfig {
   token_unit: 'minilm-wordpiece';
   heading_prefix_max_tokens: number;
   default: SlidingWindowChunker;
-  per_type?: Partial<Record<ChunkingType, Chunker>>;
+  /** Always present; `{}` when every chunk type uses `default`. */
+  per_type: Partial<Record<ChunkingType, Chunker>>;
 }
 
 // ---- Response shapes (§6) ----
@@ -57,9 +58,11 @@ export interface ChunkingConfig {
 export interface Preset {
   preset: string;
   embedding_model: string;
-  // TODO(design §6): confirm with backend — "" vs null when a preset has no instruction.
-  query_instruction: string | null;
+  /** "" when the model takes no query instruction; never null. */
+  query_instruction: string;
   chunking: ChunkingConfig;
+  /** Whether Infinity currently serves `embedding_model`; creating an unserved one is a 422. */
+  served: boolean;
 }
 
 export interface Profile {
@@ -68,9 +71,9 @@ export interface Profile {
   name: string;
   preset: string;
   embedding_model: string;
-  // TODO(design §6): confirm with backend — §6 example shows "", §5 column is plain TEXT.
-  query_instruction: string | null;
-  // TODO(design §6): confirm with backend — §6 example shows `{}`; typed as the §4.4.1 shape.
+  /** Copied from the preset; "" when there is none, never null. */
+  query_instruction: string;
+  /** The preset's full config, copied at creation. */
   chunking: ChunkingConfig;
   /** Display only; refreshed at job finish and resource delete. */
   chunk_count: number;
@@ -128,8 +131,8 @@ export interface SyncResourceResponse {
   jobs: Job[];
 }
 
-// TODO(design §6): confirm with backend — §6 lists only key names for health; element
-// and null types here are assumed.
+/** A down service reports `{ ok: false, models: [] }`. Ollama lists tags (`qwen2.5:1.5b`),
+ * Infinity model ids. */
 export interface ServiceHealth {
   ok: boolean;
   models: string[];
@@ -138,10 +141,13 @@ export interface ServiceHealth {
 export interface RagHealth {
   ollama: ServiceHealth;
   infinity: ServiceHealth;
+  /** server_version is Chroma's API version, null when down; client_version is the package. */
   chroma: { ok: boolean; server_version: string | null; client_version: string };
   gitlab_token_configured: boolean;
   live_enabled: boolean;
   defaults: { profile: string; threshold: number; model: string };
+  /** MAX_UPLOAD_MB / MAX_ZIP_MB; the zip cap applies to .zip uploads. */
+  limits: { max_upload_mb: number; max_zip_mb: number };
 }
 
 // ---- Request shapes (§6) ----
@@ -179,6 +185,7 @@ export interface UploadResourceFields {
 
 export type RagErrorCode =
   | 'VALIDATION_ERROR'
+  | 'NOT_FOUND'
   | 'UNKNOWN_PRESET'
   | 'EMBEDDING_MODEL_NOT_SERVED'
   | 'DUPLICATE_PROFILE'
@@ -191,7 +198,8 @@ export type RagErrorCode =
   | 'PAYLOAD_TOO_LARGE'
   | 'UNSUPPORTED_FILE'
   | 'UNSAFE_ARCHIVE'
-  | 'PROTECTED_RESOURCE';
+  | 'PROTECTED_RESOURCE'
+  | 'CHROMA_UNAVAILABLE';
 
 /** Profile names: lowercase alphanumerics and hyphens, 3–64 chars (§5). */
 export const PROFILE_NAME_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
@@ -211,8 +219,8 @@ export const ragPaths = {
     `/courses/${courseId}/rag/resources/${resourceId}`,
   resourceSync: (courseId: number, resourceId: number) =>
     `/courses/${courseId}/rag/resources/${resourceId}/sync`,
-  // TODO(design §6): confirm with backend — whether `status=` takes one value or a list;
-  // the UI filters client-side and never sends it.
-  jobs: (courseId: number, limit = 20) => `/courses/${courseId}/rag/jobs?limit=${limit}`,
+  /** `status` takes a single JobStatus; `limit` is 1–100. */
+  jobs: (courseId: number, limit = 20, status?: JobStatus) =>
+    `/courses/${courseId}/rag/jobs?limit=${limit}${status ? `&status=${status}` : ''}`,
   job: (courseId: number, jobId: number) => `/courses/${courseId}/rag/jobs/${jobId}`,
 };

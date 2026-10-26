@@ -31,10 +31,8 @@ function describeChunker(c: Chunker): string {
 }
 
 function describeChunking(chunking: ChunkingConfig): string {
-  // Guarded: the §6 example shows `chunking: {}`.
-  if (!chunking?.default) return '—';
   const parts = [`default ${describeChunker(chunking.default)}`];
-  for (const [type, c] of Object.entries(chunking.per_type ?? {})) {
+  for (const [type, c] of Object.entries(chunking.per_type)) {
     if (c) parts.push(`${type} ${describeChunker(c)}`);
   }
   return parts.join(' · ');
@@ -170,11 +168,18 @@ export default function ProfilesPage() {
               {presets.map((p) => (
                 <option key={p.preset} value={p.preset}>
                   {p.preset} — {p.embedding_model}
+                  {p.served ? '' : ' (not served)'}
                 </option>
               ))}
             </Select>
             {selectedPreset && (
               <p className="text-muted text-xs">{describeChunking(selectedPreset.chunking)}</p>
+            )}
+            {selectedPreset && !selectedPreset.served && (
+              <p className="text-danger text-xs">
+                Infinity isn't serving {selectedPreset.embedding_model}, so this preset can't be
+                created until it is.
+              </p>
             )}
             <Input
               placeholder={preset ? `Name (defaults to ${preset})` : 'Name (optional)'}

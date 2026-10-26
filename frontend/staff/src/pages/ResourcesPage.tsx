@@ -8,6 +8,7 @@ import {
   type CreateResourceRequest,
   type Job,
   type Profile,
+  type RagHealth,
   type Resource,
   type SyncResourceRequest,
   type SyncResourceResponse,
@@ -30,24 +31,22 @@ const TYPE_LABELS: Record<Resource['resource_type'], string> = {
   historical_qa: 'Historical Q&A',
 };
 
-// TODO(design §6): confirm with backend — which extensions each type accepts on upload
-// (§4.5.1 table); the server's UNSUPPORTED_FILE is the real check.
+// catalog.UPLOAD_SUFFIXES; anything else is UNSUPPORTED_FILE.
 const UPLOAD_ACCEPT: Record<CreatableResourceType, string> = {
-  syllabus: '.html',
-  schedule: '.html',
+  syllabus: '.html,.htm',
+  schedule: '.html,.htm',
   repository: '.zip,.md,.pdf',
 };
 
-// TODO(design §6): confirm with backend — MAX_UPLOAD_MB / MAX_ZIP_MB are env settings the
-// frontend can't read; these are the §4.3.2 initial values. The server's 413 is authoritative.
-const MAX_UPLOAD_MB = 20;
-const MAX_ZIP_MB = 50;
+// The §4.3.2 defaults, until GET /rag/health reports the server's limits.
+const DEFAULT_LIMITS: RagHealth['limits'] = { max_upload_mb: 20, max_zip_mb: 50 };
 
 export default function ResourcesPage() {
   const { courseId } = useCourse();
   const [resources, setResources] = useState<Resource[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
+  const [limits, setLimits] = useState(DEFAULT_LIMITS);
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -91,6 +90,13 @@ export default function ResourcesPage() {
       setLoadError(errorMessage(err, 'Failed to load resources'));
     }
   }
+
+  useEffect(() => {
+    api
+      .get<RagHealth>(ragPaths.health)
+      .then((h) => setLimits(h.limits))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setCreated(null);
@@ -140,7 +146,7 @@ export default function ResourcesPage() {
     e.preventDefault();
     if (!courseId || !file) return;
     const isZip = file.name.toLowerCase().endsWith('.zip');
-    const limitMb = isZip ? MAX_ZIP_MB : MAX_UPLOAD_MB;
+    const limitMb = isZip ? limits.max_zip_mb : limits.max_upload_mb;
     if (file.size > limitMb * 1024 * 1024) {
       setUploadError(`File is larger than ${limitMb} MB`);
       return;
@@ -279,8 +285,8 @@ export default function ResourcesPage() {
                 }}
                 className="w-full"
               >
-                <option value="syllabus">Syllabus (.html)</option>
-                <option value="schedule">Schedule (.html)</option>
+                <option value="syllabus">Syllabus (.html, .htm)</option>
+                <option value="schedule">Schedule (.html, .htm)</option>
                 <option value="repository">Repository (.zip, .md or .pdf)</option>
               </Select>
               <Input
@@ -303,12 +309,11 @@ export default function ResourcesPage() {
                   value={citationBase}
                   onChange={(e) => setCitationBase(e.target.value)}
                 />
-                {/* TODO(design §6): confirm with backend — how the base joins a single-file
-                    upload's name, whether a trailing "/" is needed, and whether it applies to
-                    .html uploads. Help text only; no client-side validation. */}
+                {/* citations.upload_url: a single file cites the base as-is; a zip appends
+                    each member's path after one "/"; any #fragment is dropped. */}
                 <p className="text-muted text-xs mt-1">
-                  Where students can view this content. For a zip, each file's path inside the
-                  zip is appended. Without it, citations show as unlinked text.
+                  Where students can view this content: the file's own URL, or for a zip the
+                  folder its paths are relative to. Without it, citations show as unlinked text.
                 </p>
               </div>
               {uploadError && <p className="text-danger text-sm">{uploadError}</p>}
