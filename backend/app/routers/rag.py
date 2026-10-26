@@ -11,8 +11,14 @@ from ..common.dependencies import CourseMember, require_course_staff, require_ra
 from ..config import settings
 from ..database import get_db
 from ..models.user import User
-from ..schemas.rag import EmptyBody, ProfileCreate, ResourceRegister, ResourceSync
-from ..services.rag import catalog, clients
+from ..schemas.rag import (
+    CompareRequest,
+    EmptyBody,
+    ProfileCreate,
+    ResourceRegister,
+    ResourceSync,
+)
+from ..services.rag import catalog, clients, pipeline
 from ..services.rag.ingest import schedule_job
 from ..services.rag.locks import JOB_CREATE_LOCK
 
@@ -203,3 +209,10 @@ async def list_jobs(
 @router.get(f"{COURSE}/jobs/{{job_id}}")
 async def get_job(course_id: int, job_id: int, _: Staff, db: Db) -> dict:
     return await catalog.get_job(db, course_id, job_id)
+
+
+@router.post(f"{COURSE}/compare")
+async def compare(course_id: int, body: CompareRequest, _: Staff, db: Db) -> dict:
+    """Dry run for eval/compare_harness.py: retrieval and generation with the
+    request's settings, creating no Question or Post (design §4.4.5)."""
+    return await pipeline.compare(db, course_id, body)

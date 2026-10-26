@@ -6,10 +6,17 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 from urllib.parse import urlsplit
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 PROFILE_NAME = r"^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$"
 _SHA = re.compile(r"^[0-9a-fA-F]{40}$")
@@ -121,3 +128,17 @@ class ResourceSync(BaseModel):
 
 class EmptyBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
+
+
+class CompareRequest(BaseModel):
+    """The harness's five fields, all required (design §4.4.5)."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    question: Annotated[
+        str, StringConstraints(strip_whitespace=True, min_length=1, max_length=4000)
+    ]
+    ingestion_profile: str = Field(min_length=1, max_length=64)
+    similarity_threshold: float = Field(ge=0.0, le=1.0, allow_inf_nan=False)
+    system_prompt: str = Field(min_length=1, max_length=8000)
+    generation_model: str = Field(min_length=1, max_length=100)
