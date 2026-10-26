@@ -103,7 +103,7 @@ Health probes for the RAG services, each bounded by `HEALTH_TIMEOUT_S` (3 s) and
 
 ### `rag/tokens.py`, `rag/presets.py`, `rag/chunking.py`, `rag/citations.py`
 
-Pure functions with no I/O. M4's ingestion jobs call them (design-rag.md §4.1, §4.4.1, §4.5.4).
+Pure functions with no I/O. The M4 ingestion jobs call them (design-rag.md §4.1, §4.4.1, §4.5.4).
 - **`tokens`:** chunk tokens from the vendored MiniLM `assets/minilm_tokenizer.json`. The file ships with truncation and padding at 128; the loader turns both off.
 - **`presets`:** the four presets and `validate_chunking(chunking, model)`.
 - **`chunking`:**
@@ -114,6 +114,35 @@ Pure functions with no I/O. M4's ingestion jobs call them (design-rag.md §4.1, 
   - `source_url(chunk, CitationContext, rel_path)` builds the stored citation.
   - `assign_ids` gives chunk IDs. Call it once per (resource, rel_path) group.
   - `chunk_metadata` gives Chroma metadata, leaving out any `None` value.
+
+### Ingestion (M4): `rag/locks.py`, `ssrf.py`, `archives.py`, `fetchers.py`, `embeddings.py`, `store.py`, `ingest.py`, `catalog.py`
+
+Design-rag.md §4.5, §4.6 and §6.
+- **`ssrf`:** `guarded_get` is the only way the backend fetches a staff-supplied URL.
+  - It resolves each host once and refuses internal addresses, including IPv4 embedded in IPv6.
+  - It then connects to that IP, with the original name sent as `Host` and as the TLS SNI.
+  - It follows at most 5 redirects, re-checking each one, and opens a fresh connection per hop.
+  - `check_registration_host` is the earlier check at registration. It accepts a host that does not resolve.
+- **`archives`:** `read_zip` checks every entry before reading anything. It refuses absolute paths, `..`, backslashes, symlinks and encrypted entries, and it caps the archive at 2000 entries and 200 MB of bytes actually read. It keeps only `.md` and `.pdf` files and strips a single shared top-level directory.
+- **`fetchers`:** `fetch(resource)` gives the documents plus a `CitationContext`, and every failure becomes a `FetchError` scrubbed of the GitLab token. The sources are:
+  - uploads;
+  - web pages;
+  - GitLab files, through the files API, where the ref is the first path segment;
+  - `git clone --depth 1`, with config only through `GIT_CONFIG_*`, a 120 s timeout, a 500 MB watchdog, and a process-group kill.
+  - PDFs are parsed in a thread, with a 60 s limit and at most 500 pages.
+- **`embeddings` / `store`:**
+  - **`embeddings`:** Infinity `/embeddings` and `served_models()`.
+  - **`store`:** one Chroma collection per profile (cosine), always with `embedding_function=None`.
+- **`ingest`:**
+  - **`sync_resource`:** the §4.5.6 add / keep / stale sync. Embedding goes in batches of 8, and a failed write is rolled back.
+    - A source that fails or gives no chunks is marked FAILED and nothing is deleted.
+    - The exception is historical Q&A: since MySQL is the source of truth, zero qualifying threads is READY with 0 chunks.
+  - **`run_job`:** holds `INGESTION_LOCK` and uses one short session per step. A failing resource is isolated, so the remaining resources still sync.
+  - **`schedule_job`:** starts a job after its row is committed.
+- **`catalog`:**
+  - The profile, resource and job operations for the router, plus their serializers.
+  - Like the rest, it flushes but does not commit.
+  - Writes call `ensure_course`, because ADMIN passes the course check for any id.
 
 ## Things to know before extending
 
