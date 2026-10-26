@@ -42,7 +42,10 @@ Work is split by file so the two of us never edit the same file:
 | Staff pages switched from mock JSON to the live API, open-question TODOs resolved | T4 | varikooty | 2026-10-28 |
 | AI-answer label, citation links and status polling in the student and staff apps; staff screenshots in `docs/ui/` | T5, T8 | varikooty | 2026-10-29 |
 | Redeploy: merge `main` (M5 and the RAG services) into `production`; VM `.env` RAG block; models pulled into the VM's Ollama (`docker exec … ollama pull`, deployment Part 8 step 5.1); course seeded | T5, T9 | varikooty | 2026-10-30 |
+| U8: browser check of 5 text-fragment citations against the real pages; any mismatch fixed in the chunkers | T4, T6 | vzhou2 | 2026-10-30 |
+| Eval dry run on the local stack: threshold calibrated, `eval/configs.json`, preflight and a harness run, so the VM run is a rerun | T6 | vzhou2 | 2026-10-29 |
 | `sample_data/` ingested on the VM under every profile, threshold calibrated, `eval/configs.json`, preflight, harness run against the deployment, `report.*` and `summary.md` committed | T6 | vzhou2 | 2026-10-31 |
+| B12 (`test_b12_decline_posts_nothing`) accepts `NO_MATCH` as inconclusive, like `ANSWERED` (`docs/plan-m5-pipeline.md` M5 results) | T7 | varikooty | 2026-10-29 |
 | Integration tests re-run against the full stack; CI pipeline green on `main` | T2, T7 | varikooty | 2026-10-31 |
 | Individual documents `docs/vzhou2.md` and `docs/varikooty.md` | T10 | each | 2026-11-01 |
 
