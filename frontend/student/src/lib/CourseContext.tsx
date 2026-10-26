@@ -33,6 +33,13 @@ export function CourseProvider({ children }: { children: ReactNode }) {
     try {
       const data = await api.get<MyCourse[]>('/courses/mine');
       setCourses(data);
+      // `?course=<id>` (used by historical-thread citations) wins for a member
+      const requested = Number(new URLSearchParams(window.location.search).get('course'));
+      if (requested && data.some((c) => c.id === requested)) {
+        localStorage.setItem('course_id', String(requested));
+        setCourseIdState(requested);
+        return;
+      }
       setCourseIdState((current) => {
         if (current && data.some((c) => c.id === current)) return current;
         return data[0]?.id ?? null;
