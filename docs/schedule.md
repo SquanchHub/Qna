@@ -29,13 +29,13 @@ Work is split by file so the two of us never edit the same file:
 | Eval plan revised for threshold, abstention, hit-rate and median-time metrics | T3, T6 | vzhou2 | 2026-10-25 |
 | M1: Ollama, Infinity and ChromaDB in `docker-compose.yml` (pinned, verified U1, U4, U6), `.env.template`, one-shot model pulls, health probes and `GET /api/rag/health` (branch `feature/rag-services`; plan in `docs/plan-m1-rag-services.md`) | T5 | vzhou2 | 2026-10-25 |
 | M2: migration `002_rag` (upgrade/downgrade verified), RAG models, AI system user with `SYSTEM_ACCOUNT` guards, historical-Q&A resource per course, restart sweep, `ai_status`/`citations`/`ai_model` serializers, `decline.py`; frontend open questions answered in design §6 (branch `feature/rag-data-model`; plan in `docs/plan-m2-rag-data-model.md`) | T4, T5 | vzhou2 | 2026-10-25 |
+| M3: vendored MiniLM tokenizer, presets with validation, structure-aware chunkers (markdown, HTML, PDF, historical Q&A) with sliding-window and semantic fallbacks, citation URLs, chunk IDs and Chroma metadata; 104 unit tests passing on `eval/sample_data/` (branch `feature/rag-chunking`; plan in `docs/plan-m3-chunking.md`) | T4 | vzhou2 | 2026-10-25 |
 
 ### Remaining
 
 | Milestone | Tasks | Owner | Target date |
 |---|---|---|---|
 | Merge `test/rag-tests` and `feature/staff-theme`; first `main` → `production` deploy verified (Part 8; the VM currently does not respond) | T7, T8, T9 | varikooty | 2026-10-26 |
-| Tokenizer, type-tailored chunkers and citation helpers, with unit tests passing on `eval/sample_data/` | T4 | vzhou2 | 2026-10-27 |
 | Fetchers, ingestion jobs, re-sync, profile and resource APIs; `test_rag_ingestion` and `test_rag_access` green | T4, T7 | vzhou2 | 2026-10-28 |
 | Staff pages switched from mock JSON to the live API, open-question TODOs resolved | T4 | varikooty | 2026-10-28 |
 | RAG pipeline, `POST /api/courses/{course_id}/rag/compare` dry run, background answer job (retrieval, threshold, tagged prompt with guardrail, labeled and cited AI post); `test_rag_compare` and `test_rag_board` green | T5, T6, T7 | vzhou2 | 2026-10-29 |

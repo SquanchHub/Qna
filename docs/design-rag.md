@@ -285,6 +285,12 @@ A profile copies `name`, `embedding_model`, `query_instruction` (prepended to qu
 
 `sliding-window` meets T6's naive baseline: one fixed window applied identically to every type's oversized content, on the shared structural split. **`type-tailored` justification:** *PDF* slides are dense, one concept per page, and the ground truth targets slide titles, so a smaller page-bounded window keeps a slide together and cites exact pages. *Markdown* docs nest dense bullets under h4+ task headings, so a smaller window restarting at each sub-heading keeps one sub-topic per chunk while preserving exact line provenance (sentence-based semantic splitting would blur it). *Syllabus and schedule* policy prose shifts topic within one heading, so semantic splits follow those shifts, with the required cap and recursive window.
 
+**As built (M3, 2026-10-25).**
+- **Budget:** `+ 4` is read as `[CLS]`, `[SEP]` and 2 tokens of whole-word expansion slack. A window may also spend the part of the 30-token prefix budget its own prefix leaves unused.
+- **Validation:** `default` must be a plain `sliding_window`, unknown keys are rejected, and the "served by Infinity" check runs at profile creation (M4).
+- **Sub-headings:** the sample markdown has no h4–h6, only `**bold**` sub-topic lines, so `reset_at: subheading` never fires on it, and `type-tailored` markdown is effectively a 150/30 window there. Revisit when tuning, before the eval.
+- **Chunk counts** on `eval/sample_data/`: 180 (`sliding-window`) and 228 (`type-tailored`, semantic stubbed); see `docs/plan-m3-chunking.md` §10.
+
 **Byte-identical chunks** hold only for all-sliding-window profiles (`sliding-window`, `embedding-alt`, `bge-small`): sharing the chunk-token unit, they produce identical chunks, so the embedding axis isolates the model. Semantic chunking depends on the embedding model, but `type-tailored` shares its config with no other profile.
 
 #### 4.4.2 Query-time configuration

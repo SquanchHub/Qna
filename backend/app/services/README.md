@@ -101,6 +101,20 @@ Health probes for the RAG services, each bounded by `HEALTH_TIMEOUT_S` (3 s) and
 - **Infinity:** `GET /health`, then `GET /models`, returns the served model ids.
 - **Chroma:** `GET /api/v2/heartbeat`, then `/api/v2/version`. That endpoint returns the API version (`"1.0.0"`), not the server release, so it is reported but not compared with the `chromadb-client` version. The matching pins in `docker-compose.yml` and `requirements.txt` guard against skew instead.
 
+### `rag/tokens.py`, `rag/presets.py`, `rag/chunking.py`, `rag/citations.py`
+
+Pure functions with no I/O. M4's ingestion jobs call them (design-rag.md §4.1, §4.4.1, §4.5.4).
+- **`tokens`:** chunk tokens from the vendored MiniLM `assets/minilm_tokenizer.json`. The file ships with truncation and padding at 128; the loader turns both off.
+- **`presets`:** the four presets and `validate_chunking(chunking, model)`.
+- **`chunking`:**
+  - `chunk_markdown`, `chunk_pdf` (with `pdf_pages`), `chunk_qa` (with `qa_answer`, which picks a thread's answer) and `chunk_html`.
+  - `chunk_html` is async only because semantic profiles call `embed`; sliding-window profiles never embed.
+  - Each returns `Chunk`s with display text sliced from the source and their line or page range.
+- **`citations`:**
+  - `source_url(chunk, CitationContext, rel_path)` builds the stored citation.
+  - `assign_ids` gives chunk IDs. Call it once per (resource, rel_path) group.
+  - `chunk_metadata` gives Chroma metadata, leaving out any `None` value.
+
 ## Things to know before extending
 
 - Historical Q&A ingestion can query `Question` and `Post` directly. "Accepted" is `Post.is_accepted`; "closed" is `Question.status == "CLOSED"`.
