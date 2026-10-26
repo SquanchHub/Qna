@@ -488,7 +488,9 @@ Embedding and retrieval take no app lock (Infinity queues internally; ingestion 
 - **`resource_profile_states`** (PK `resource_id`, `profile_id`, both FK CASCADE): `status` ENUM('QUEUED','RUNNING','READY','FAILED'); `chunk_count` INT; `last_commit_sha` VARCHAR(40) NULL; `last_synced_at` NULL; `error` TEXT NULL.
 - **`ingestion_jobs`**: `id` PK; `course_id`, `profile_id` FK CASCADE; `scope` ENUM('resource','profile'); `resource_id` NULL FK **CASCADE**, set exactly when `scope = 'resource'`; `status` ENUM('QUEUED','RUNNING','SUCCEEDED','FAILED'); `chunks_added`, `chunks_updated`, `chunks_deleted` INT DEFAULT 0; `error` TEXT NULL; `created_by_user_id`; `created_at`, `started_at`, `finished_at`; INDEX(`course_id`, `created_at`).
 
-Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_role` with `existing_type`, adds columns, creates tables in FK order. Downgrade deletes `author_role = 'AI'` posts, drops tables and columns, restores the two-value enum. The system user and historical-Q&A resources come from `bootstrap`.
+Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_role` with `existing_type`, adds columns, creates tables in FK order. Downgrade deletes `author_role = 'AI'` posts and then the AI user, drops tables and columns, restores the two-value enum. The system user and historical-Q&A resources come from `bootstrap`, in one transaction with the restart sweep, so a database still at 001 gets none of them.
+
+**As built (M2, 2026-10-25).** `query_instruction` is `TEXT NOT NULL`, written as `""` when unused (MySQL TEXT takes no server default). Every `created_by_user_id` is `ON DELETE SET NULL`. Enum names follow 001: `question_ai_status`, `resource_type`, `resource_source_kind`, `resource_state_status`, `job_scope`, `job_status`. The profile-name pattern is checked by the M4 request schema, not a DB CHECK. MySQL commits each DDL statement, so a failed upgrade must be cleaned up by hand (see the migration docstring). Verified: upgrade, `downgrade 001`, upgrade on the dev database, with post and question counts unchanged.
 
 ---
 
@@ -497,10 +499,12 @@ Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_ro
 **Conventions.** Course routes are under `/api/courses/{course_id}/rag` with `require_course_staff` (401 no token, 404 non-member, 403 student surface or role). Errors `{"error", "message"}`. Timestamps UTC ISO 8601 with `Z` (stored UTC; U10). Requests `extra="forbid"`. An ID from another course returns the same 404 as a missing one (`PROFILE_NOT_FOUND`, `RESOURCE_NOT_FOUND`, `JOB_NOT_FOUND`). An empty ID list is 422 `VALIDATION_ERROR`; omit the field for "all". No PATCH or PUT: change by delete and re-create.
 
 ```json
-// Profile
+// Profile ("chunking" is always the full §4.4.1 object, never {})
 {"id": 3, "course_id": 1, "name": "sliding-window", "preset": "sliding-window",
  "embedding_model": "sentence-transformers/all-MiniLM-L6-v2", "query_instruction": "",
- "chunking": {}, "chunk_count": 412, "collection_name": "c1_p3", "active_job_id": null, "created_at": "2026-10-24T18:03:11Z"}
+ "chunking": {"token_unit": "minilm-wordpiece", "heading_prefix_max_tokens": 30,
+              "default": {"method": "sliding_window", "chunk_size": 200, "chunk_overlap": 40}, "per_type": {}},
+ "chunk_count": 412, "collection_name": "c1_p3", "active_job_id": null, "created_at": "2026-10-24T18:03:11Z"}
 // Resource
 {"id": 7, "course_id": 1, "resource_type": "repository", "source_kind": "url", "title": "Sample repo",
  "url": "https://git.doit.wisc.edu/<ns>/qna-74", "git_ref": "main", "subpath": "eval/sample_data/repo",
@@ -534,7 +538,22 @@ Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_ro
 
 **Multi-profile sync is all-or-nothing:** if any target profile has an active job, 409 `JOB_RUNNING` and no jobs are created.
 
-**Changed shapes.** `PostResponse`: `author_role` may be `"AI"`; adds `citations` (§4.1.3 list or null) and `ai_model`. `QuestionSummary`/`QuestionDetail` add `ai_status`; `POST /questions` returns it (`PENDING`, `SKIPPED` or `NONE`). Admin mutations of the AI user: 409 `SYSTEM_ACCOUNT`.
+**Changed shapes.** `PostResponse`: `author_role` may be `"AI"`; adds `citations` (§4.1.3 list or null) and `ai_model`. `QuestionSummary`/`QuestionDetail` add `ai_status`; `POST /questions` returns it (`PENDING`, `SKIPPED` or `NONE`; always `NONE` until M5 adds the responder). Admin mutations of the AI user: 409 `SYSTEM_ACCOUNT`; the username `qna-ai-assistant` is reserved (422 on create or rename).
+
+**Answers to `docs/frontend-open-questions.md` (2026-10-25).**
+1. **Errors.** Every error body has `error` and `message`. Pydantic 422s (`VALIDATION_ERROR`) also keep `detail`, and `message` is the first error as `<field>: <msg>`. Every RAG-specific 422 (`URL_NOT_ALLOWED`, `UNSUPPORTED_FILE`, `UNSAFE_ARCHIVE`, `EMBEDDING_MODEL_NOT_SERVED`, …) is an app error with a `message`. A request body over nginx's `client_max_body_size 50m` gets nginx's HTML 413, which is accepted. Multipart overhead makes the effective zip limit slightly under `MAX_ZIP_MB` (50).
+2. **`citation_base_url`.**
+   - For a single `.md`, `.pdf` or `.html` upload, the base **is** that file's or page's URL, used as-is, and the type suffix is appended (`#L…`, `#page=…`, `#:~:text=…`).
+   - For a zip, the base is a directory URL. The backend adds a `/` if it is missing, joins the in-zip path, and only then inserts `?plain=1` before `#L` for a GitLab `/-/blob/` base.
+   - Valid on every upload type. It is checked as an http(s) URL of ≤ 2048 characters, else 422 `VALIDATION_ERROR`. There is no SSRF check, because it is never fetched.
+3. **Upload types.**
+   - syllabus/schedule: `.html`, `.htm`
+   - repository: `.zip`, `.md`, `.pdf`
+   - A type/extension mismatch is 422 `UNSUPPORTED_FILE`.
+   - **Planned (M4):** `GET /api/rag/health` gains `limits: {max_upload_mb, max_zip_mb}` with the upload route. Until then, use 20 and 50.
+4. **Jobs.** `status=` takes one value (`QUEUED`, `RUNNING`, `SUCCEEDED` or `FAILED`), and `limit` defaults to 20.
+5. **Profile fields.** `chunking` is always the full §4.4.1 object, never `{}`. `query_instruction` is always a string (`""` when unused), never null. Health types are given in the table above.
+6. **Presets.** **Planned (M4):** each preset gains `served: bool`, true when Infinity's `/models` lists its `embedding_model` at request time, so the UI can disable unserved presets. Create still returns 422 `EMBEDDING_MODEL_NOT_SERVED` as the authority.
 
 ---
 
@@ -673,7 +692,7 @@ Baseline: `sliding-window`, calibrated T, `BASELINE_GUARDRAIL` verbatim, `qwen2.
 | U7 | gte ingest time; 3b generation < 100 s on 4 vCPUs | Measure on VM (M6); if still slow, `num_predict` 200, decided before calibration |
 | U8 | Fragments from extracted text match real pages | Browser check of 5 citations (M5) |
 | U9 | httpx connecting to a pre-resolved IP with original `Host` and SNI | Unit test with a local TLS server (M4); else a custom transport |
-| U10 | MySQL container timezone is UTC | `SELECT @@global.time_zone, NOW()` (M2) |
+| U10 | MySQL container timezone is UTC | **Verified 2026-10-25 on dev (mysql:8.0):** `@@global.time_zone` is `SYSTEM` and `NOW()` = `UTC_TIMESTAMP()`; the VM runs the same image (recheck at M6) |
 
 **Open risks.** (1) Prompt injection via historical Q&A: mitigated (§4.6), not eliminated. (2) Grading re-run aborts (missing model or profile, OOM, version skew, busy lock): preflight, `RAG_LIVE_ENABLED=false`, `mem_limit`, pinned versions, our own run on the VM after the last deploy. (3) Reproducibility drift: frozen course, temperature 0 with seed, T10 note. (4) One threshold confounds the embedding axis: accepted and stated; `eval/calibration.json` separates retrieval quality from score scale (§11.2). (5) Single-worker assumption. (6) No course-delete endpoint exists; one added later must drop `c{id}_p*` collections.
 

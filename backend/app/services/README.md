@@ -27,7 +27,13 @@ Runs in the FastAPI lifespan, from `main.py`.
 
 - **First admin:** creates it from `ADMIN_USERNAME`/`ADMIN_PASSWORD` if no non-grader ADMIN exists.
 - **Grader:** keeps an ADMIN user named `grader` in sync with `GRADER_PASSWORD_HASH`, which is base64 of a bcrypt hash. This runs on every startup.
-- **Waiting for the schema:** retries every 5 seconds until `alembic upgrade head` has created it.
+- **RAG state** (`bootstrap_rag`): runs in one transaction, so a database still at migration 001 gets none of it.
+  - Creates the AI system user. If a real account already holds that name (one with a password, netid, email or admin role), it is not adopted. An `ai_user_name_taken` error is logged, the board runs without an AI author (`ai_user_id()` raises), and an admin can rename that account, since the 409 guard applies only to the true system account.
+  - Assumes one backend process, which both compose stacks run.
+  - Adds a missing historical-Q&A resource to each course.
+  - Sweeps work the previous process was killed in: `PENDING` questions, and `QUEUED`/`RUNNING` jobs and states, become `FAILED` ("interrupted by restart").
+  - `ai_user_id()` returns the cached id for the answer job.
+- **Waiting for the schema:** retries every 5 seconds until `alembic upgrade head` has created it, including MySQL's "unknown column/table" errors when migrations lag the code. Because the RAG step always runs, startup now always waits for the schema, even with no admin or grader configured.
 
 ### `qa_service.py`: the thread model
 
@@ -79,6 +85,14 @@ Runs in the FastAPI lifespan, from `main.py`.
 
 - `process_staff_csv` reads a CSV with `netid`, `full_name` and `email` columns, up to 200 rows.
 - For each row it creates the user if missing and grants or upgrades the user to **STAFF** immediately. It does not wait for the user to log in.
+
+### `rag/resources.py`
+
+`ensure_qa_resource(db, course_id)` adds the course's one historical-Q&A resource if it is missing. It flushes but never commits. It is used by bootstrap and by `POST /api/admin/courses`.
+
+### `rag/decline.py`
+
+`is_decline` and `matched_decline_phrase` (design-rag.md §4.2.4): the `INSUFFICIENT_CONTEXT` prefix, or a known phrase in an answer under 400 characters. The module has no imports, so `eval/summarize.py` can load it by path.
 
 ### `rag/clients.py`
 

@@ -9,11 +9,11 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..common.dependencies import require_admin
-from ..common.exceptions import ConflictError, NotFoundError
+from ..common.exceptions import ConflictError, NotFoundError, SystemAccountError
 from ..common.uploads import read_upload_capped
 from ..database import get_db
 from ..models.course import Course, CourseRoster, UserCourseAccess
-from ..models.user import User
+from ..models.user import User, is_system_account
 from ..schemas.admin import (
     CourseAccessGrant,
     CourseCreate,
@@ -30,11 +30,19 @@ from ..schemas.admin import (
     UserWithAccessResponse,
 )
 from ..services.auth_service import hash_password
+from ..services.rag.resources import ensure_qa_resource
 from ..services.roster_service import process_roster_csv, process_roster_rows
 from ..services.staff_service import process_staff_csv
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 logger = structlog.get_logger()
+
+
+def _refuse_system_account(user: User) -> None:
+    """The AI system user is managed by bootstrap only (design-rag.md §4.2)."""
+    if is_system_account(user):
+        raise SystemAccountError()
+
 
 # ---------------------------------------------------------------------------
 # Courses
@@ -61,6 +69,7 @@ async def create_course(
     course = Course(name=body.name, semester=body.semester)
     db.add(course)
     await db.flush()
+    await ensure_qa_resource(db, course.id)
     await db.refresh(course)
     await db.commit()
     logger.info("course_created", course_id=course.id, name=body.name)
@@ -310,6 +319,7 @@ async def update_user(
     user = await db.get(User, user_id)
     if not user:
         raise NotFoundError(f"User {user_id} not found")
+    _refuse_system_account(user)
     if body.username is not None:
         existing = await db.execute(
             select(User).where(User.username == body.username, User.id != user_id)
@@ -337,6 +347,7 @@ async def delete_user(
     user = await db.get(User, user_id)
     if not user:
         raise NotFoundError(f"User {user_id} not found")
+    _refuse_system_account(user)
     if user.role == "ADMIN":
         raise ConflictError("Cannot delete an admin account")
     await db.delete(user)
@@ -357,6 +368,7 @@ async def grant_course_access(
     user = await db.get(User, user_id)
     if not user:
         raise NotFoundError(f"User {user_id} not found")
+    _refuse_system_account(user)
     course = await db.get(Course, body.course_id)
     if not course:
         raise NotFoundError(f"Course {body.course_id} not found")
@@ -383,6 +395,10 @@ async def revoke_course_access(
     _: Annotated[User, Depends(require_admin)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> None:
+    user = await db.get(User, user_id)
+    if not user:
+        raise NotFoundError(f"User {user_id} not found")
+    _refuse_system_account(user)
     result = await db.execute(
         select(UserCourseAccess).where(
             UserCourseAccess.user_id == user_id,

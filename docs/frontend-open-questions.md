@@ -1,5 +1,7 @@
 # Frontend open questions for the RAG API
 
+**Status: all six answered on 2026-10-25 in `docs/design-rag.md` §6, under "Answers to docs/frontend-open-questions.md".** The `TODO(design §6)` markers in `frontend/` can now be resolved against those answers. Items 3 (`limits` in health) and 6 (`served` on presets) land with M4.
+
 The staff Resources and Profiles pages were built against `docs/design-rag.md` §6 before the backend routes existed. These are the points where the spec doesn't pin down what the frontend needs. Each one has a conservative default in the code, marked `TODO(design §6): confirm with backend`. Once a question is answered, please update §6 and the frontend will follow.
 
 ## 1. Error bodies

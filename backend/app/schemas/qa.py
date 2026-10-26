@@ -56,6 +56,7 @@ class QuestionSummary(BaseModel):
     categories: list[CategoryResponse]
     post_count: int
     has_accepted_answer: bool
+    ai_status: str
     created_at: datetime
     updated_at: datetime
 
@@ -75,12 +76,16 @@ class PostResponse(BaseModel):
     id: int
     question_id: int
     author: AuthorSummary
+    # STUDENT, STAFF or AI; always set by the server, never by PostCreate
     author_role: str
     kind: str
     body: str
     is_accepted: bool
     accepted_by: AuthorSummary | None
     accepted_at: datetime | None
+    # AI posts only (design-rag.md §4.1.3); null on human posts
+    citations: list[dict] | None
+    ai_model: str | None
     created_at: datetime
 
 
@@ -98,6 +103,7 @@ class QuestionDetail(BaseModel):
     author: AuthorSummary
     categories: list[CategoryResponse]
     posts: list[PostResponse]
+    ai_status: str
     closed_by: AuthorSummary | None
     closed_at: datetime | None
     created_at: datetime

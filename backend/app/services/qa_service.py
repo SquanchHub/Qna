@@ -35,6 +35,8 @@ def serialize_post(post: Post) -> dict:
         "is_accepted": post.is_accepted,
         "accepted_by": author_summary(post.accepted_by) if post.accepted_by else None,
         "accepted_at": post.accepted_at,
+        "citations": post.citations,
+        "ai_model": post.ai_model,
         "created_at": post.created_at,
     }
 
@@ -49,6 +51,7 @@ def serialize_question_summary(question: Question) -> dict:
         "categories": [link.category for link in question.category_links],
         "post_count": len(question.posts),
         "has_accepted_answer": any(p.is_accepted for p in question.posts),
+        "ai_status": question.ai_status,
         "created_at": question.created_at,
         "updated_at": question.updated_at,
     }
@@ -64,6 +67,7 @@ def serialize_question_detail(question: Question) -> dict:
         "author": author_summary(question.author),
         "categories": [link.category for link in question.category_links],
         "posts": [serialize_post(p) for p in question.posts],
+        "ai_status": question.ai_status,
         "closed_by": author_summary(question.closed_by) if question.closed_by else None,
         "closed_at": question.closed_at,
         "created_at": question.created_at,
@@ -216,11 +220,13 @@ async def create_question(
                 f"Unknown category id(s) for this course: {sorted(missing)}"
             )
 
+    # NONE until the auto-responder lands (design-rag.md §4.2.4, milestone M5)
     question = Question(
         course_id=course_id,
         author_user_id=author.id,
         title=data.title,
         body=data.body,
+        ai_status="NONE",
     )
     db.add(question)
     await db.flush()
