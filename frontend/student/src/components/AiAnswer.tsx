@@ -1,5 +1,5 @@
 import { ExternalLink, Sparkles } from 'lucide-react';
-import type { Citation } from '../lib/types';
+import type { AiStatus, Citation } from '../lib/types';
 import { citationLabel, isLinkable } from '../lib/citations';
 import { Badge } from './ui/badge';
 
@@ -55,5 +55,25 @@ export function CitationList({ citations }: { citations: Citation[] }) {
           })}
       </ol>
     </div>
+  );
+}
+
+const STATUS_TEXT: Partial<Record<AiStatus, string>> = {
+  PENDING: 'AI assistant is looking for an answer…',
+  ANSWERED: 'AI assistant answered',
+  NO_MATCH: 'No confident AI answer',
+  DECLINED: 'No confident AI answer',
+  SKIPPED: 'AI assistant skipped this question',
+  FAILED: 'AI assistant could not answer',
+};
+
+/** One muted line; nothing for NONE (no attempt was made). */
+export function AiStatusNote({ status }: { status: AiStatus }) {
+  const text = STATUS_TEXT[status];
+  if (!text) return null;
+  return (
+    <span className="inline-flex items-center gap-1 text-xs text-muted">
+      <Sparkles size={12} className={status === 'PENDING' ? 'animate-pulse' : ''} /> {text}
+    </span>
   );
 }
