@@ -1,6 +1,6 @@
 import { cn } from '../../lib/utils';
 
-export type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'outline';
+export type BadgeVariant = 'default' | 'success' | 'warning' | 'danger' | 'info' | 'outline' | 'ai';
 
 interface BadgeProps extends React.HTMLAttributes<HTMLSpanElement> {
   variant?: BadgeVariant;
@@ -17,6 +17,7 @@ export function Badge({ className, variant = 'default', ...props }: BadgeProps) 
         variant === 'danger' && 'bg-danger/10 text-danger',
         variant === 'info' && 'bg-info/10 text-info',
         variant === 'outline' && 'border border-border text-secondary',
+        variant === 'ai' && 'bg-ai/10 text-ai',
         className
       )}
       {...props}

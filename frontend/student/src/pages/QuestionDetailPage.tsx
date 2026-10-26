@@ -8,6 +8,8 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
+import { AiBadge, AiDisclaimer, CitationList } from '../components/AiAnswer';
+import { aiAnswerText } from '../lib/citations';
 
 export default function QuestionDetailPage() {
   const { courseId } = useCourse();
@@ -80,14 +82,21 @@ export default function QuestionDetailPage() {
 
       <div className="space-y-3">
         {question.posts.map((post) => (
-          <Card key={post.id} className={post.is_accepted ? 'border-success' : ''}>
+          <Card
+            key={post.id}
+            className={post.is_accepted ? 'border-success' : post.author_role === 'AI' ? 'border-ai/40' : ''}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-primary">{post.author.display_name}</span>
-                  <Badge variant={post.author_role === 'STAFF' ? 'default' : 'outline'}>
-                    {post.author_role === 'STAFF' ? 'Course Staff' : 'Student'}
-                  </Badge>
+                  {post.author_role === 'AI' ? (
+                    <AiBadge />
+                  ) : (
+                    <Badge variant={post.author_role === 'STAFF' ? 'default' : 'outline'}>
+                      {post.author_role === 'STAFF' ? 'Course Staff' : 'Student'}
+                    </Badge>
+                  )}
                   <Badge variant="outline">{post.kind === 'ANSWER' ? 'Answer' : 'Follow-up'}</Badge>
                 </div>
                 {post.is_accepted && (
@@ -96,7 +105,15 @@ export default function QuestionDetailPage() {
                   </span>
                 )}
               </div>
-              <p className="text-primary whitespace-pre-wrap">{post.body}</p>
+              {post.author_role === 'AI' ? (
+                <>
+                  <p className="text-primary whitespace-pre-wrap">{aiAnswerText(post)}</p>
+                  <CitationList citations={post.citations ?? []} />
+                  <AiDisclaimer />
+                </>
+              ) : (
+                <p className="text-primary whitespace-pre-wrap">{post.body}</p>
+              )}
             </CardContent>
           </Card>
         ))}
