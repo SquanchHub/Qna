@@ -32,15 +32,16 @@ Work is split by file so the two of us never edit the same file:
 | M3: vendored MiniLM tokenizer, presets with validation, structure-aware chunkers (markdown, HTML, PDF, historical Q&A) with sliding-window and semantic fallbacks, citation URLs, chunk IDs and Chroma metadata; 104 unit tests passing on `eval/sample_data/` (branch `feature/rag-chunking`; plan in `docs/plan-m3-chunking.md`) | T4 | vzhou2 | 2026-10-25 |
 | M4: SSRF-guarded fetchers (URL, GitLab file, repository clone, upload with zip and PDF safety), ingestion jobs with incremental re-sync, profile, resource and job APIs, `limits` in health and `served` on presets; `test_rag_ingestion` and `test_rag_access` green apart from M5 skips (branch `feature/rag-ingestion`; plan in `docs/plan-m4-ingestion.md`) | T4, T7 | vzhou2 | 2026-10-25 |
 | M5: retrieval with threshold, tagged prompt with guardrail and escaping, `POST /api/courses/{course_id}/rag/compare` dry run with timings and CPU, background answer job (conditional `ai_status` writes, row-locked AI post and close, labeled and cited AI post); `test_rag_compare` and `test_rag_board` green apart from B12, whose off-topic question abstains as `NO_MATCH` (test fix for varikooty); U8 left for M5f (branch `feature/rag-pipeline`; plan in `docs/plan-m5-pipeline.md`) | T5, T6, T7 | vzhou2 | 2026-10-25 |
+| `test/rag-tests` and `feature/staff-theme` merged; first `main` → `production` deploy verified (VM at `http://34.121.90.110` serves the apps and `/api/health`; `production` is at the M4 merge) | T7, T8, T9 | varikooty | 2026-10-25 |
+| RAG services (`ollama`, `infinity`, `chroma`) in `docker-compose.prod.yml` with `mem_limit` 9g/4g, no published ports, backend RAG URLs pinned; Infinity serves MiniLM and gte only; nginx redirects bare app paths (branch `deploy/rag-services`) | T5, T9 | varikooty | 2026-10-25 |
 
 ### Remaining
 
 | Milestone | Tasks | Owner | Target date |
 |---|---|---|---|
-| Merge `test/rag-tests` and `feature/staff-theme`; first `main` → `production` deploy verified (Part 8; the VM currently does not respond) | T7, T8, T9 | varikooty | 2026-10-26 |
 | Staff pages switched from mock JSON to the live API, open-question TODOs resolved | T4 | varikooty | 2026-10-28 |
 | AI-answer label, citation links and status polling in the student and staff apps; staff screenshots in `docs/ui/` | T5, T8 | varikooty | 2026-10-29 |
-| RAG services added to `docker-compose.prod.yml` with `mem_limit`; redeploy with the RAG stack; models pulled and course seeded on the VM | T5, T9 | vzhou2 (compose), varikooty (deploy, VM) | 2026-10-30 |
+| Redeploy: merge `main` (M5 and the RAG services) into `production`; VM `.env` RAG block; models pulled into the VM's Ollama (`docker exec … ollama pull`, deployment Part 8 step 5.1); course seeded | T5, T9 | varikooty | 2026-10-30 |
 | `sample_data/` ingested on the VM under every profile, threshold calibrated, `eval/configs.json`, preflight, harness run against the deployment, `report.*` and `summary.md` committed | T6 | vzhou2 | 2026-10-31 |
 | Integration tests re-run against the full stack; CI pipeline green on `main` | T2, T7 | varikooty | 2026-10-31 |
 | Individual documents `docs/vzhou2.md` and `docs/varikooty.md` | T10 | each | 2026-11-01 |
