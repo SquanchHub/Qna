@@ -2,9 +2,11 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# System deps for asyncmy (MySQL C extension) and cryptography (for python-jose)
+# System deps for asyncmy (MySQL C extension) and cryptography (for python-jose);
+# git clones repository resources for RAG ingestion
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
+    git \
     default-libmysqlclient-dev \
     pkg-config \
     && rm -rf /var/lib/apt/lists/*

@@ -35,6 +35,38 @@ class Settings(BaseSettings):
     # staff can sign in to your deployment without you sharing a password.
     GRADER_PASSWORD_HASH: str = ""
 
+    # RAG (design-rag.md §4.3.2). "Initial" values there are tuned later;
+    # RAG_DEFAULT_THRESHOLD is replaced by the §11.2 calibration.
+    RAG_LIVE_ENABLED: bool = True
+    OLLAMA_URL: str = "http://ollama:11434"
+    INFINITY_URL: str = "http://infinity:7997"
+    CHROMA_HOST: str = "chroma"
+    CHROMA_PORT: int = 8000
+    RAG_DEFAULT_PROFILE: str = "sliding-window"
+    RAG_DEFAULT_THRESHOLD: float = 0.50
+    RAG_DEFAULT_MODEL: str = "qwen2.5:1.5b"
+    RAG_TOP_K: int = 4
+    RAG_LIVE_GENERATION_TIMEOUT_S: float = 120
+    RAG_LIVE_LOCK_WAIT_S: float = 600
+    RAG_MAX_PENDING_PER_COURSE: int = 3
+    RAG_COMPARE_LOCK_WAIT_S: float = 30
+    RAG_COMPARE_EMBED_TIMEOUT_S: float = 15
+    RAG_COMPARE_GENERATION_TIMEOUT_S: float = 100
+    RAG_INGEST_EMBED_TIMEOUT_S: float = 120
+    GITLAB_HOST: str = "git.doit.wisc.edu"
+    # read_repository + read_api. A runtime secret: only ever in each machine's
+    # .env, never logged, returned, stored in MySQL or set as a CI variable.
+    GITLAB_TOKEN: str = ""
+    UPLOAD_DIR: str = "/data/uploads"
+    CLONE_TMP_DIR: str = "/tmp"
+    MAX_UPLOAD_MB: int = 20
+    MAX_ZIP_MB: int = 50
+    MAX_FETCH_MB: int = 10
+
+    @property
+    def chroma_url(self) -> str:
+        return f"http://{self.CHROMA_HOST}:{self.CHROMA_PORT}"
+
     @property
     def cors_origins_list(self) -> list[str]:
         return [o.strip() for o in self.CORS_ORIGINS.split(",")]

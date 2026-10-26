@@ -4,6 +4,8 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
 
+from ..models.user import AI_USERNAME
+
 # ---------------------------------------------------------------------------
 # Courses
 # ---------------------------------------------------------------------------
@@ -91,6 +93,12 @@ class StaffUploadResult(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+def _not_reserved(username: str) -> str:
+    if username == AI_USERNAME:
+        raise ValueError(f"'{AI_USERNAME}' is reserved for the AI system account")
+    return username
+
+
 class UserCreate(BaseModel):
     model_config = ConfigDict(extra="forbid")
     username: str = Field(..., min_length=3, max_length=50, pattern=r"^[a-zA-Z0-9_-]+$")
@@ -101,7 +109,7 @@ class UserCreate(BaseModel):
     @field_validator("username")
     @classmethod
     def lower_username(cls, v: str) -> str:
-        return v.lower()
+        return _not_reserved(v.lower())
 
 
 class UserUpdate(BaseModel):
@@ -117,7 +125,7 @@ class UserUpdate(BaseModel):
     @field_validator("username")
     @classmethod
     def lower_username(cls, v: str | None) -> str | None:
-        return v.lower() if v is not None else None
+        return _not_reserved(v.lower()) if v is not None else None
 
 
 class UserResponse(BaseModel):

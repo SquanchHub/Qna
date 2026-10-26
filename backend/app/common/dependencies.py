@@ -59,6 +59,29 @@ async def require_admin(
     return user
 
 
+async def require_rag_viewer(
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    x_app_surface: Annotated[str | None, Header(alias="X-App-Surface")] = None,
+) -> User:
+    """Global RAG routes (GET /api/rag/health): ADMIN, or STAFF in some course.
+
+    Like require_course_member, the student surface clamps everyone to STUDENT.
+    """
+    if x_app_surface == "student":
+        raise ForbiddenError("Course staff access required")
+    if user.role == "ADMIN":
+        return user
+    result = await db.execute(
+        select(UserCourseAccess.course_id)
+        .where(UserCourseAccess.user_id == user.id, UserCourseAccess.role == "STAFF")
+        .limit(1)
+    )
+    if result.scalar_one_or_none() is None:
+        raise ForbiddenError("Course staff access required")
+    return user
+
+
 async def get_refresh_token(
     refresh_token: Annotated[str | None, Cookie()] = None,
 ) -> str:

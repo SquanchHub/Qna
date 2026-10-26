@@ -4,6 +4,7 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     DateTime,
     Enum,
@@ -22,6 +23,16 @@ from ..database import Base
 if TYPE_CHECKING:
     from .course import Course
     from .user import User
+
+AI_STATUSES = (
+    "NONE",
+    "PENDING",
+    "ANSWERED",
+    "NO_MATCH",
+    "DECLINED",
+    "SKIPPED",
+    "FAILED",
+)
 
 
 class Category(Base):
@@ -63,6 +74,13 @@ class Question(Base):
     body: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(
         Enum("OPEN", "CLOSED", name="question_status"), default="OPEN", nullable=False
+    )
+    # The AI auto-responder's progress on this question (design-rag.md §4.2.3)
+    ai_status: Mapped[str] = mapped_column(
+        Enum(*AI_STATUSES, name="question_ai_status"),
+        default="NONE",
+        server_default="NONE",
+        nullable=False,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -119,7 +137,9 @@ class Post(Base):
 
     `author_role` snapshots the author's course role (STUDENT/STAFF) at the
     moment of posting, so a "staff answer" badge never retroactively changes
-    if that person's course access is later revoked or altered.
+    if that person's course access is later revoked or altered. AI marks a
+    post written by the RAG auto-responder as the system user; only the
+    server sets it, with `citations`, `ai_model` and `ai_profile`.
     """
 
     __tablename__ = "posts"
@@ -133,7 +153,7 @@ class Post(Base):
         String(36), ForeignKey("users.id"), nullable=False
     )
     author_role: Mapped[str] = mapped_column(
-        Enum("STUDENT", "STAFF", name="post_author_role"), nullable=False
+        Enum("STUDENT", "STAFF", "AI", name="post_author_role"), nullable=False
     )
     kind: Mapped[str] = mapped_column(
         Enum("ANSWER", "FOLLOWUP", name="post_kind"), nullable=False
@@ -144,6 +164,10 @@ class Post(Base):
         String(36), ForeignKey("users.id"), nullable=True
     )
     accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # Rank-ordered snapshot of the chunks cited by an AI post (design §4.1.3)
+    citations: Mapped[list[dict] | None] = mapped_column(JSON, nullable=True)
+    ai_model: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    ai_profile: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     question: Mapped[Question] = relationship("Question", back_populates="posts")
