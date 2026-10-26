@@ -60,10 +60,11 @@ Used by `routers/qa.py`.
   - `ResourceRegister`: validates the http(s) URL, rejects repository-only fields on other resource types, and rejects SHA, option-like and malformed `git_ref` values and `..`, absolute or backslash `subpath` values. It also normalises `subpath`.
   - `ResourceSync`: `profile_ids` must have at least one entry when given, and duplicates are dropped.
   - `EmptyBody`.
+  - `CompareRequest`: the harness's five fields, all required. `question` is stripped and 1–4000 characters, `similarity_threshold` 0.0–1.0 (no NaN).
 - Responses are dicts built by `services/rag/catalog.py`. Their shape depends on the course's profiles: every resource lists a state per profile.
 - `utc_z` formats every RAG timestamp as `…Z`.
 
 ## Things to know before extending
 
-- `PostResponse` has no field that could carry citations or an "AI-generated" marker. Clients only see what is listed here, so new post metadata needs new fields in this file and in `qa_service.serialize_post`.
+- `PostResponse` carries `author_role` (`"AI"` for the auto-responder), `citations` and `ai_model`. Clients only see what is listed here, so new post metadata needs new fields in this file and in `qa_service.serialize_post`.
 - New feature areas (for example RAG resources or `/rag/compare`) should get their own module here rather than growing `qa.py`.

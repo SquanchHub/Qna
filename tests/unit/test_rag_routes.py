@@ -223,3 +223,92 @@ async def test_upload_refuses_a_pdf_over_the_page_cap(monkeypatch):
             MagicMock(), 1, 1, "repository", "Slides", None, file
         )
     assert err.value.code == "UNSUPPORTED_FILE" and "500 pages" in err.value.message
+
+
+# --- POST /rag/compare request (design §4.4.5) ------------------------------
+
+COMPARE = {
+    "question": "What does Quindlewort require?",
+    "ingestion_profile": "sliding-window",
+    "similarity_threshold": 0.5,
+    "system_prompt": "Only use the tagged context.",
+    "generation_model": "qwen2.5:1.5b",
+}
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        *[{"drop": k} for k in COMPARE],
+        {"set": {"top_k": 3}},
+        {"set": {"similarity_threshold": 1.5}},
+        {"set": {"similarity_threshold": -0.1}},
+        {"set": {"similarity_threshold": float("nan")}},
+        {"set": {"question": ""}},
+        {"set": {"question": "  \n\t "}},
+        {"set": {"question": "q" * 4001}},
+        {"set": {"system_prompt": ""}},
+        {"set": {"system_prompt": "p" * 8001}},
+        {"set": {"ingestion_profile": ""}},
+        {"set": {"ingestion_profile": "a" * 65}},
+        {"set": {"generation_model": ""}},
+        {"set": {"generation_model": "m" * 101}},
+    ],
+)
+def test_compare_request_rejects(change):
+    from app.schemas.rag import CompareRequest
+
+    body = dict(COMPARE)
+    if "drop" in change:
+        del body[change["drop"]]
+    else:
+        body.update(change["set"])
+    with pytest.raises(ValidationError):
+        CompareRequest(**body)
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        {"similarity_threshold": 0.0},
+        {"similarity_threshold": 1.0},
+        {"similarity_threshold": 1},
+        {"question": "q" * 4000},
+        {"question": "  padded  " + "q" * 3990},
+    ],
+)
+def test_compare_request_accepts_edges(change):
+    from app.schemas.rag import CompareRequest
+
+    req = CompareRequest(**{**COMPARE, **change})
+    assert req.question == req.question.strip()
+    assert 0.0 <= req.similarity_threshold <= 1.0
+
+
+async def test_compare_route_returns_the_pipeline_result(monkeypatch):
+    from app.main import app
+    from app.routers import rag as rag_router
+
+    seen = {}
+
+    async def compare(db, course_id, req):
+        seen["args"] = (course_id, req.ingestion_profile)
+        return {"matched": False, "retrieved_chunks": [], "answer": None,
+                "metrics": {"embedding_time_ms": 1, "retrieval_time_ms": 1,
+                            "generation_time_ms": 0, "cpu_percent": 0.0}}
+
+    async def override_db():
+        yield MagicMock()
+
+    monkeypatch.setattr(rag_router.pipeline, "compare", compare)
+    app.dependency_overrides[require_course_staff] = lambda: MagicMock()
+    app.dependency_overrides[get_db] = override_db
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://t") as ac:
+            r = await ac.post("/api/courses/7/rag/compare", json=COMPARE)
+            bad = await ac.post("/api/courses/7/rag/compare", json={})
+    finally:
+        app.dependency_overrides.clear()
+    assert r.status_code == 200 and r.json()["matched"] is False
+    assert seen["args"] == (7, "sliding-window")
+    assert bad.status_code == 422 and bad.json()["error"] == "VALIDATION_ERROR"

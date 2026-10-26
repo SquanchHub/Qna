@@ -205,7 +205,11 @@ async def get_question(db: AsyncSession, course_id: int, question_id: int) -> Qu
 
 
 async def create_question(
-    db: AsyncSession, course_id: int, author: User, data: QuestionCreate
+    db: AsyncSession,
+    course_id: int,
+    author: User,
+    data: QuestionCreate,
+    ai_status: str = "NONE",
 ) -> Question:
     if data.category_ids:
         result = await db.execute(
@@ -220,13 +224,13 @@ async def create_question(
                 f"Unknown category id(s) for this course: {sorted(missing)}"
             )
 
-    # NONE until the auto-responder lands (design-rag.md §4.2.4, milestone M5)
+    # The router decides NONE, PENDING or SKIPPED (design-rag.md §4.2.4)
     question = Question(
         course_id=course_id,
         author_user_id=author.id,
         title=data.title,
         body=data.body,
-        ai_status="NONE",
+        ai_status=ai_status,
     )
     db.add(question)
     await db.flush()
@@ -273,6 +277,51 @@ async def create_post(
         author_role=author_role,
     )
     return await _get_question(db, course_id, question_id)
+
+
+async def create_ai_answer(
+    db: AsyncSession,
+    question_id: int,
+    author_user_id: str,
+    body: str,
+    citations: list[dict],
+    ai_model: str,
+    ai_profile: str,
+) -> Post | None:
+    """The auto-responder's ANSWER (design-rag.md §4.2.4). Locks the question
+    row, so a close that committed first is seen (ConflictError) and one that
+    starts later waits for this insert. Returns None, inserting nothing, if
+    the question already has an AI post."""
+    result = await db.execute(
+        select(Question).where(Question.id == question_id).with_for_update()
+    )
+    question = result.scalar_one_or_none()
+    if question is None:
+        raise NotFoundError(f"Question {question_id} not found")
+    if question.status == "CLOSED":
+        raise ConflictError("This question's thread is closed to new posts")
+    existing = await db.execute(
+        select(Post.id)
+        .where(Post.question_id == question_id, Post.author_role == "AI")
+        .limit(1)
+    )
+    if existing.scalar_one_or_none() is not None:
+        return None
+
+    post = Post(
+        question_id=question_id,
+        author_user_id=author_user_id,
+        author_role="AI",
+        kind="ANSWER",
+        body=body,
+        citations=citations,
+        ai_model=ai_model,
+        ai_profile=ai_profile,
+    )
+    db.add(post)
+    await db.flush()
+    logger.info("ai_post_created", question_id=question_id, post_id=post.id)
+    return post
 
 
 async def set_post_accepted(
@@ -323,9 +372,18 @@ async def set_post_accepted(
 async def close_question(
     db: AsyncSession, course_id: int, question_id: int, staff_user: User
 ) -> Question:
-    question = await _get_question(db, course_id, question_id)
-    if question.status == "CLOSED":
+    # Lock the row first, so an AI answer being inserted (create_ai_answer)
+    # commits before this reads, and its post predates closed_at. The locking
+    # read sees the latest row; the caller must start a fresh transaction
+    # first, or the plain reads below use an older REPEATABLE READ snapshot.
+    locked = await db.execute(
+        select(Question.status)
+        .where(Question.id == question_id, Question.course_id == course_id)
+        .with_for_update()
+    )
+    if locked.scalar_one_or_none() == "CLOSED":
         raise ConflictError("This question's thread is already closed")
+    question = await _get_question(db, course_id, question_id)
     question.status = "CLOSED"
     question.closed_at = datetime.now(timezone.utc)
     question.closed_by_user_id = staff_user.id

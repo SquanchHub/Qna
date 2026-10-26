@@ -28,6 +28,7 @@ from ..schemas.qa import (
     QuestionSummary,
 )
 from ..services import qa_service
+from ..services.rag import answer_job
 
 router = APIRouter(tags=["qa"])
 logger = structlog.get_logger()
@@ -153,8 +154,14 @@ async def create_question(
     member: Annotated[CourseMember, Depends(require_course_member)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
-    question = await qa_service.create_question(db, course_id, member.user, body)
+    ai_status = await answer_job.initial_status(db, course_id)
+    question = await qa_service.create_question(
+        db, course_id, member.user, body, ai_status=ai_status
+    )
     await db.commit()
+    # Only after the commit, so the job's own session sees the question
+    if ai_status == "PENDING":
+        answer_job.schedule(question.id)
     return qa_service.serialize_question_detail(question)
 
 
@@ -228,6 +235,9 @@ async def close_question(
     member: Annotated[CourseMember, Depends(require_course_staff)],
     db: Annotated[AsyncSession, Depends(get_db)],
 ):
+    # A fresh transaction, so the snapshot isn't the one the auth check read
+    # (see qa_service.close_question); expire_on_commit=False keeps member.user
+    await db.commit()
     question = await qa_service.close_question(db, course_id, question_id, member.user)
     await db.commit()
     return qa_service.serialize_question_detail(question)

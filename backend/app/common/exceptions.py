@@ -51,6 +51,27 @@ class PayloadTooLargeError(QnaError):
         )
 
 
+class UnprocessableError(QnaError):
+    """A well-formed request the server can't act on, such as an unpulled model."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(code, message, status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+
+class ServiceUnavailableError(QnaError):
+    """An upstream service refused, failed, or is busy (design-rag.md §4.4.5)."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(code, message, status.HTTP_503_SERVICE_UNAVAILABLE)
+
+
+class GatewayTimeoutError(QnaError):
+    """An upstream service took longer than its bound (design-rag.md §4.4.5)."""
+
+    def __init__(self, code: str, message: str):
+        super().__init__(code, message, status.HTTP_504_GATEWAY_TIMEOUT)
+
+
 def validation_message(errors: list[dict]) -> str:
     """One line for clients that show only `message`: the first error, with
     its location minus the leading "body"/"query"/"path"."""
