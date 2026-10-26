@@ -127,7 +127,7 @@ Chunk `resource_type` values match the ground truth: `syllabus`, `schedule`, `re
 | `question_id` | int | `historical_qa` |
 | `commit_sha` | str | GitLab-sourced chunks |
 
-**`content_hash`** = sha256 hex of the full **embedded text**, prefix included, so a heading rename yields a new ID and new embedding. **Chunk ID** = `sha256(resource_id | rel_path or "" | content_hash | dup_ordinal)`, `dup_ordinal` disambiguating identical texts in one file. The Chroma `document` is the embedded text, returned by compare as `text`.
+**`content_hash`** = sha256 hex of the full **embedded text**, prefix included, so a heading rename yields a new ID and new embedding. **Chunk ID** = `sha256(resource_id | rel_path or "" | content_hash | dup_ordinal)`, `dup_ordinal` disambiguating identical texts in one file. The Chroma `document` is the embedded text, returned by compare as `text`. **As built (M4/M5):** the stored `document` is the **display text** (no heading prefix); only the embedding uses the embedded text. Compare's `text` and the prompt bodies are therefore display text, and the prompt's `section`/`file` attributes carry the heading path.
 
 #### 4.1.3 Citations on the AI post
 
@@ -191,6 +191,8 @@ answer_job.run(question_id):
 ```
 
 `create_ai_answer` loads the question; raises `ConflictError` if CLOSED; **returns without inserting if an `author_role = 'AI'` post already exists** (idempotent); otherwise inserts `Post(kind=ANSWER, author_role=AI, author_user_id=<system user>, …)` and flushes. `finish(s)` sets the status in a short session.
+
+**As built (M5, 2026-10-25).** Code in `services/rag/answer_job.py`. The job is started with `asyncio.create_task` (a module-level task set, like ingestion jobs) rather than `BackgroundTasks`, so it runs outside the request's lifecycle. Every status write is `WHERE ai_status = 'PENDING'`, so a terminal value never changes. The AI post and `ANSWERED` are one transaction: `create_ai_answer` (which takes the author id as an argument) locks the question row with `FOR UPDATE`, and `close_question` (after starting a fresh transaction) takes the same lock and checks CLOSED on the locked row before it reads, so a post can never land after `closed_at`, and two simultaneous closes give one 200 and one 409. A question already CLOSED when the job starts is `SKIPPED` before retrieval; an empty model answer is `FAILED`. The live embed uses `RAG_INGEST_EMBED_TIMEOUT_S`, since Infinity may be busy with an ingestion batch and nobody waits on the job. The PENDING cap is soft: two creates at the same instant can both pass.
 
 **Restarts.** Exactly one uvicorn worker: dev runs `--reload` (`docker-compose.yml:39`), which can't combine with `--workers`; prod (`deployment_instructions.md` Part 7) passes no `--workers`. A dev save kills in-flight jobs, so **at startup `bootstrap` sets every `PENDING` question to `FAILED`** (no re-enqueue: models may not be healthy yet), and sets `QUEUED`/`RUNNING` ingestion jobs and their states to `FAILED` ("interrupted by restart").
 
@@ -370,6 +372,8 @@ Tag = the chunk's `resource_type`; in text and attributes `<`, `>`, `"` become `
 
 **Timeout budget.** ≤ 30 s lock + 15 s embed + ≈ 1 s query + 100 s generation ≈ 146 s < 180 s. With `RAG_LIVE_ENABLED=false` during harness runs the lock is uncontended.
 
+**As built (M5, 2026-10-25).** The order of checks is as above, except that `db.rollback()` runs right after the profile lookup, since nothing after it reads MySQL. Only `chromadb.errors.NotFoundError` counts as "no collection" (`PROFILE_EMPTY`); any other Chroma error is 503. Bounds: one 5 s bound on Chroma open + `count()`, 5 s on the query, 5 s on Ollama `/api/tags`, 3 s on Infinity `/models`, then the 15 s / 30 s / 100 s above, so the worst case is 163 s; the whole request also runs under a 170 s deadline (504 `UPSTREAM_TIMEOUT`). `n_results = min(RAG_TOP_K, count)`. An Ollama 404 at generation time (the model was removed after the tag check) is 422 `MODEL_NOT_AVAILABLE`. The question in the prompt is escaped like the context, so it cannot close `</context>`.
+
 **Dry run.** Compare lives in `services/rag/pipeline.py`, which never imports `qa_service` (unit-tested); it only reads the profile row and queries Chroma. T7 asserts global row and Chroma counts (§10). The only side effect is which model Ollama has loaded.
 
 #### 4.4.6 Board defaults (env only)
@@ -548,7 +552,7 @@ Hand-written (autogenerate misses MySQL ENUM changes). Upgrade alters `author_ro
 
 **As built (M4, 2026-10-25).** A DELETE of a profile or resource that can't reach Chroma is 503 `CHROMA_UNAVAILABLE`, and the row is kept. For a resource, earlier profiles' chunks may already be gone, and retrying is safe. A PDF over 500 pages is 422 `UNSUPPORTED_FILE` at upload; a corrupt or Deflate64 zip is 422 `UNSAFE_ARCHIVE`. Health now returns `limits: {max_upload_mb, max_zip_mb}`, and each preset returns `served` (both answers below are no longer "planned"). Duplicate `profile_ids` are collapsed, keeping their order. An ADMIN on a course id that doesn't exist gets 404 `NOT_FOUND` before anything is written.
 
-**Changed shapes.** `PostResponse`: `author_role` may be `"AI"`; adds `citations` (§4.1.3 list or null) and `ai_model`. `QuestionSummary`/`QuestionDetail` add `ai_status`; `POST /questions` returns it (`PENDING`, `SKIPPED` or `NONE`; always `NONE` until M5 adds the responder). Admin mutations of the AI user: 409 `SYSTEM_ACCOUNT`; the username `qna-ai-assistant` is reserved (422 on create or rename).
+**Changed shapes.** `PostResponse`: `author_role` may be `"AI"`; adds `citations` (§4.1.3 list or null) and `ai_model`. `QuestionSummary`/`QuestionDetail` add `ai_status`; `POST /questions` returns it (`PENDING`, `SKIPPED` or `NONE`). Admin mutations of the AI user: 409 `SYSTEM_ACCOUNT`; the username `qna-ai-assistant` is reserved (422 on create or rename).
 
 **Answers to `docs/frontend-open-questions.md` (2026-10-25).**
 1. **Errors.** Every error body has `error` and `message`. Pydantic 422s (`VALIDATION_ERROR`) also keep `detail`, and `message` is the first error as `<field>: <msg>`. Every RAG-specific 422 (`URL_NOT_ALLOWED`, `UNSUPPORTED_FILE`, `UNSAFE_ARCHIVE`, `EMBEDDING_MODEL_NOT_SERVED`, …) is an app error with a `message`. A request body over nginx's `client_max_body_size 50m` gets nginx's HTML 413, which is accepted. Multipart overhead makes the effective zip limit slightly under `MAX_ZIP_MB` (50).

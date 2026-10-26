@@ -144,7 +144,22 @@ Design-rag.md §4.5, §4.6 and §6.
   - Like the rest, it flushes but does not commit.
   - Writes call `ensure_course`, because ADMIN passes the course check for any id.
 
+### Pipeline and live board (M5): `rag/prompts.py`, `metrics.py`, `pipeline.py`, `answer_job.py`
+
+Design-rag.md §4.2.3–§4.2.5 and §4.4.3–§4.4.6.
+- **`prompts`:** `BASELINE_GUARDRAIL` (T6's text, verbatim), `LIVE_PROMPT` (the guardrail plus the injection and `INSUFFICIENT_CONTEXT` instructions), and `user_message`, which wraps each chunk in a tag named for its `resource_type`. `<`, `>` and `"` are replaced in chunk text, attributes and the question, so nothing can forge or close a tag.
+- **`metrics`:** `cpu_percent` is whole-host busy time from `psutil.cpu_times()` over the embed/query window and the generation window.
+- **`pipeline`:** `retrieve` (Infinity, then Chroma; the raw `1 − distance` is compared with the threshold), `generate` (one Ollama chat call), and `compare`, the fixed contract behind `POST /rag/compare`.
+  - Upstream failures become 503 `UPSTREAM_UNAVAILABLE`, timeouts 504 `UPSTREAM_TIMEOUT`. Every call is bounded, and the whole compare has a 170 s deadline, under the harness's 180 s.
+  - It never imports `qa_service`; a unit test enforces this, because compare must stay a dry run.
+- **`answer_job`:** `initial_status` decides NONE / PENDING / SKIPPED when a question is created, and `run` moves PENDING to exactly one terminal status.
+  - Each database step is its own short session, and no session is open during a model call.
+  - Every status change is `WHERE ai_status = 'PENDING'`, so terminal statuses never change.
+  - The AI post and ANSWERED are written in one transaction, after `qa_service.create_ai_answer` locks the question row.
+- **`locks.GENERATION_LOCK`** is held only around an Ollama call. Compare waits 30 s for it (else 503 `GENERATION_BUSY`), the live job 600 s (else FAILED).
+
 ## Things to know before extending
 
 - Historical Q&A ingestion can query `Question` and `Post` directly. "Accepted" is `Post.is_accepted`; "closed" is `Question.status == "CLOSED"`.
-- Long-running work (model calls, cloning a repository) shouldn't hold a request open on the shared session. Because services flush and never commit, an AI post created after the question's commit needs its own session, for example a background task using `AsyncSessionLocal`.
+- Long-running work (model calls, cloning a repository) shouldn't hold a request open on the shared session. Because services flush and never commit, background work (`answer_job`, `ingest.run_job`) opens its own `AsyncSessionLocal` sessions.
+- `close_question` and `create_ai_answer` both take the question's row lock (`FOR UPDATE`) first. Keep it that way, or an AI post can land after the thread closes.

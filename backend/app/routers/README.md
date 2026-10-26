@@ -72,6 +72,7 @@ Here, "member" means `require_course_member` and "staff" means `require_course_s
 |---|---|---|
 | `GET /rag/health` | `require_rag_viewer` | `services/rag/clients.py` probes, run concurrently |
 | `/courses/{cid}/rag/presets`, `/profiles`, `/resources`, `/jobs` | `require_course_staff` | `services/rag/catalog.py` |
+| `POST /courses/{cid}/rag/compare` | `require_course_staff` | `services/rag/pipeline.compare` |
 
 `GET /rag/health` reports `ok`, the served models and the Chroma versions for Ollama, Infinity and Chroma, plus `gitlab_token_configured`, `live_enabled`, the board defaults and the upload `limits` (design-rag.md §6). It never returns 5xx: a down service shows `ok: false`. Each request opens its own `httpx.AsyncClient` through the `get_rag_http` dependency, which tests override with a `MockTransport`.
 
@@ -82,7 +83,7 @@ The course routes follow the design §6 table. Three things about them are easy 
 
 ## Things to know before extending
 
-- **`POST /courses/{course_id}/rag/compare` (M5)** goes in `rag.py` beside the other course routes.
+- **Compare is a dry run.** `POST /rag/compare` is called by the graded harness; it must never create a Question or Post. Its body is the five-field `CompareRequest`, and the response shape is fixed (design-rag.md §4.4.5).
 - **Auth for staff routes:** staff-only routes depend on `require_course_staff`. That covers staff and global admin, which is what `/rag/compare` needs.
-- **Hooking in the AI answer:** `create_question` is the natural trigger point. It commits and then returns the thread, so an AI answer generated in the background after that commit doesn't block the student's request.
+- **The AI answer trigger:** `qa.py`'s `create_question` asks `answer_job.initial_status` for the question's `ai_status`, commits, and only then calls `answer_job.schedule`. Follow-ups and answers never trigger it.
 - **File uploads:** the admin CSV endpoints and `POST /rag/resources/upload` use `UploadFile` and `read_upload_capped`.
