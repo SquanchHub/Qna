@@ -31,6 +31,7 @@ Work is split by file so the two of us never edit the same file:
 | M2: migration `002_rag` (upgrade/downgrade verified), RAG models, AI system user with `SYSTEM_ACCOUNT` guards, historical-Q&A resource per course, restart sweep, `ai_status`/`citations`/`ai_model` serializers, `decline.py`; frontend open questions answered in design §6 (branch `feature/rag-data-model`; plan in `docs/plan-m2-rag-data-model.md`) | T4, T5 | vzhou2 | 2026-10-25 |
 | M3: vendored MiniLM tokenizer, presets with validation, structure-aware chunkers (markdown, HTML, PDF, historical Q&A) with sliding-window and semantic fallbacks, citation URLs, chunk IDs and Chroma metadata; 104 unit tests passing on `eval/sample_data/` (branch `feature/rag-chunking`; plan in `docs/plan-m3-chunking.md`) | T4 | vzhou2 | 2026-10-25 |
 | M4: SSRF-guarded fetchers (URL, GitLab file, repository clone, upload with zip and PDF safety), ingestion jobs with incremental re-sync, profile, resource and job APIs, `limits` in health and `served` on presets; `test_rag_ingestion` and `test_rag_access` green apart from M5 skips (branch `feature/rag-ingestion`; plan in `docs/plan-m4-ingestion.md`) | T4, T7 | vzhou2 | 2026-10-25 |
+| M5: retrieval with threshold, tagged prompt with guardrail and escaping, `POST /api/courses/{course_id}/rag/compare` dry run with timings and CPU, background answer job (conditional `ai_status` writes, row-locked AI post and close, labeled and cited AI post); `test_rag_compare` and `test_rag_board` green apart from B12, whose off-topic question abstains as `NO_MATCH` (test fix for varikooty); U8 left for M5f (branch `feature/rag-pipeline`; plan in `docs/plan-m5-pipeline.md`) | T5, T6, T7 | vzhou2 | 2026-10-25 |
 
 ### Remaining
 
@@ -38,7 +39,6 @@ Work is split by file so the two of us never edit the same file:
 |---|---|---|---|
 | Merge `test/rag-tests` and `feature/staff-theme`; first `main` → `production` deploy verified (Part 8; the VM currently does not respond) | T7, T8, T9 | varikooty | 2026-10-26 |
 | Staff pages switched from mock JSON to the live API, open-question TODOs resolved | T4 | varikooty | 2026-10-28 |
-| RAG pipeline, `POST /api/courses/{course_id}/rag/compare` dry run, background answer job (retrieval, threshold, tagged prompt with guardrail, labeled and cited AI post); `test_rag_compare` and `test_rag_board` green | T5, T6, T7 | vzhou2 | 2026-10-29 |
 | AI-answer label, citation links and status polling in the student and staff apps; staff screenshots in `docs/ui/` | T5, T8 | varikooty | 2026-10-29 |
 | RAG services added to `docker-compose.prod.yml` with `mem_limit`; redeploy with the RAG stack; models pulled and course seeded on the VM | T5, T9 | vzhou2 (compose), varikooty (deploy, VM) | 2026-10-30 |
 | `sample_data/` ingested on the VM under every profile, threshold calibrated, `eval/configs.json`, preflight, harness run against the deployment, `report.*` and `summary.md` committed | T6 | vzhou2 | 2026-10-31 |

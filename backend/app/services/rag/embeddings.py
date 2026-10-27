@@ -10,10 +10,14 @@ from ...config import settings
 from . import clients
 
 
-async def embed(model: str, texts: list[str]) -> list[list[float]]:
+async def embed(
+    model: str, texts: list[str], timeout: float | None = None
+) -> list[list[float]]:
     """One vector per text, in order. Documents are embedded without the
-    profile's query_instruction, which applies to queries only."""
-    timeout = settings.RAG_INGEST_EMBED_TIMEOUT_S
+    profile's query_instruction, which applies to queries only (the caller
+    prepends it). `timeout` defaults to the ingestion batch timeout."""
+    if timeout is None:
+        timeout = settings.RAG_INGEST_EMBED_TIMEOUT_S
 
     async def call() -> list[dict]:
         async with httpx.AsyncClient(timeout=timeout) as http:
