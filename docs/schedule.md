@@ -40,15 +40,16 @@ Work is split by file so the two of us never edit the same file:
 | AI-answer label, citation links and `ai_status` polling in the student and staff apps (`feature/ai-answer-ui`); staff screenshots in `docs/ui/` | T5, T8 | varikooty | 2026-10-27 |
 | `eval/configs.json` and `eval/ingest_sample_data.py` (`eval/t6-report`) | T6 | varikooty | 2026-10-27 |
 | Individual documents `docs/varikooty.md` and `docs/vzhou2.md` | T10 | each | 2026-10-27 |
+| VM prepared for T6: `qwen2.5:1.5b` and `3b` pulled, `RAG_LIVE_ENABLED=false`, `RAG_COMPARE_EMBED_TIMEOUT_S=120` (gte query embeddings take ~1 min), courses seeded (eval course is id 1) | T5, T6, T9 | vzhou2 | 2026-10-28 |
+| R5 fix: historical Q&A pairs never split; long chunks clipped in the prompt only (branch `fix/grade-plus-0`; plan in `docs/plan-grade-fixes.md`) | T4 | vzhou2 | 2026-10-28 |
+| `sample_data/` ingested on the VM under all three profiles; harness run against the deployment; `eval/report.json` and `eval/report.md` committed; both write-ups updated from the report (threshold left at 0.50, not calibrated; `preflight.py` and `summarize.py` not built) | T6, T10 | vzhou2 | 2026-10-28 |
 
 ### Remaining
 
 | Milestone | Tasks | Owner | Target date |
 |---|---|---|---|
-| Redeploy: merge current `main` (AI-answer UI and later) into `production`, which is at the `fix/staff-live-api` merge; confirm the VM `.env` RAG block, models pulled into the VM's Ollama (`docker exec … ollama pull`, deployment Part 8 step 5.1) and the course seeded | T5, T9 | varikooty | 2026-10-30 |
+| Merge `main` (with `fix/grade-plus-0`) into `production`; keep the VM running and course 1 frozen (no re-syncs, no new accepted threads) through the late grading run | T6, T9 | both | 2026-10-30 |
 | U8: browser check of 5 text-fragment citations against the real pages; any mismatch fixed in the chunkers | T4, T6 | vzhou2 | 2026-10-30 |
-| Eval dry run on the local stack: threshold calibrated, preflight and a harness run, so the VM run is a rerun (`eval/configs.json` and `eval/ingest_sample_data.py` are merged; the local run was abandoned after a disk-full crash) | T6 | vzhou2 | 2026-10-29 |
-| `sample_data/` ingested on the VM under every profile, threshold calibrated, `eval/configs.json`, preflight, harness run against the deployment, `report.*` and `summary.md` committed | T6 | vzhou2 | 2026-10-31 |
 | Integration tests re-run against the full stack; CI pipeline green on `main` | T2, T7 | varikooty | 2026-10-31 |
 
 ## Check-ins
