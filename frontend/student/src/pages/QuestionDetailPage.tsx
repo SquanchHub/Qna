@@ -8,6 +8,12 @@ import { Button } from '../components/ui/button';
 import { Card, CardContent } from '../components/ui/card';
 import { Textarea } from '../components/ui/textarea';
 import { Badge } from '../components/ui/badge';
+import { AiBadge, AiDisclaimer, AiStatusNote, CitationList } from '../components/AiAnswer';
+import { aiAnswerText } from '../lib/citations';
+
+// While the auto-responder is PENDING, refetch until it settles (design-rag.md §4.2.5)
+const AI_POLL_MS = 4000;
+const AI_POLL_MAX_MS = 3 * 60 * 1000;
 
 export default function QuestionDetailPage() {
   const { courseId } = useCourse();
@@ -28,6 +34,18 @@ export default function QuestionDetailPage() {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [courseId, questionId]);
+
+  const aiPending = question?.ai_status === 'PENDING';
+  useEffect(() => {
+    if (!aiPending) return;
+    const started = Date.now();
+    const timer = setInterval(() => {
+      if (Date.now() - started > AI_POLL_MAX_MS) clearInterval(timer);
+      else load().catch(() => {});
+    }, AI_POLL_MS);
+    return () => clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aiPending, courseId, questionId]);
 
   async function handlePost(e: React.FormEvent) {
     e.preventDefault();
@@ -66,9 +84,10 @@ export default function QuestionDetailPage() {
               {question.status}
             </Badge>
           </div>
-          <p className="text-muted text-sm mt-1">
-            Asked by {question.author.display_name}
-          </p>
+          <div className="flex items-center gap-3 flex-wrap mt-1">
+            <p className="text-muted text-sm">Asked by {question.author.display_name}</p>
+            <AiStatusNote status={question.ai_status} />
+          </div>
           <p className="text-primary mt-4 whitespace-pre-wrap">{question.body}</p>
           <div className="flex gap-1.5 mt-4 flex-wrap">
             {question.categories.map((c) => (
@@ -80,14 +99,21 @@ export default function QuestionDetailPage() {
 
       <div className="space-y-3">
         {question.posts.map((post) => (
-          <Card key={post.id} className={post.is_accepted ? 'border-success' : ''}>
+          <Card
+            key={post.id}
+            className={post.is_accepted ? 'border-success' : post.author_role === 'AI' ? 'border-ai/40' : ''}
+          >
             <CardContent className="pt-6">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div className="flex items-center gap-2">
                   <span className="font-semibold text-primary">{post.author.display_name}</span>
-                  <Badge variant={post.author_role === 'STAFF' ? 'default' : 'outline'}>
-                    {post.author_role === 'STAFF' ? 'Course Staff' : 'Student'}
-                  </Badge>
+                  {post.author_role === 'AI' ? (
+                    <AiBadge />
+                  ) : (
+                    <Badge variant={post.author_role === 'STAFF' ? 'default' : 'outline'}>
+                      {post.author_role === 'STAFF' ? 'Course Staff' : 'Student'}
+                    </Badge>
+                  )}
                   <Badge variant="outline">{post.kind === 'ANSWER' ? 'Answer' : 'Follow-up'}</Badge>
                 </div>
                 {post.is_accepted && (
@@ -96,7 +122,15 @@ export default function QuestionDetailPage() {
                   </span>
                 )}
               </div>
-              <p className="text-primary whitespace-pre-wrap">{post.body}</p>
+              {post.author_role === 'AI' ? (
+                <>
+                  <p className="text-primary whitespace-pre-wrap">{aiAnswerText(post)}</p>
+                  <CitationList citations={post.citations ?? []} />
+                  <AiDisclaimer />
+                </>
+              ) : (
+                <p className="text-primary whitespace-pre-wrap">{post.body}</p>
+              )}
             </CardContent>
           </Card>
         ))}
