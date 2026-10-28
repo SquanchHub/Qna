@@ -19,7 +19,7 @@ from dataclasses import dataclass
 from bs4 import BeautifulSoup, NavigableString, Tag
 from bs4.element import Comment, Declaration, Doctype, ProcessingInstruction
 
-from .presets import QA_MAX_TOKENS, fallback_for
+from .presets import fallback_for
 from .tokens import Token, count_tokens, tokenize
 
 # Tokens a window may grow by when its ends move out to whole words
@@ -564,25 +564,11 @@ def qa_answer(question, posts):
     return None
 
 
-def chunk_qa(
-    question_id: int, title: str, body: str, answer: str, chunking: dict
-) -> list[Chunk]:
-    """One chunk per pair unless it exceeds QA_MAX_TOKENS; then `default`
-    windows, each prefixed with the question title."""
+def chunk_qa(question_id: int, title: str, body: str, answer: str) -> list[Chunk]:
+    """One chunk per pair, never split, whatever its length (T4: pairs are
+    atomic). Infinity truncates MiniLM input to 256 tokens, so the embedding
+    covers the question and the start of the answer; the prompt clips long
+    chunks (prompts.PROMPT_CHUNK_MAX_TOKENS)."""
     title = " ".join(title.split())
     text = f"Question: {title}\n{body.strip()}\n\nAnswer: {answer.strip()}"
-    if count_tokens(text) <= QA_MAX_TOKENS:
-        return [Chunk("historical_qa", title, "", text, question_id=question_id)]
-    cfg = chunking["default"]
-    tokens = tokenize(text)
-    prefix = heading_prefix(
-        [f"Question: {title}"], chunking["heading_prefix_max_tokens"]
-    )
-    spare = _spare_after(prefix, chunking["heading_prefix_max_tokens"])
-    spans = _window_spans(
-        text, tokens, 0, len(text), cfg["chunk_size"], cfg["chunk_overlap"], spare
-    )
-    return [
-        Chunk("historical_qa", title, prefix, text[a:b], question_id=question_id)
-        for a, b in spans
-    ]
+    return [Chunk("historical_qa", title, "", text, question_id=question_id)]

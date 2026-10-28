@@ -147,7 +147,7 @@ Design-rag.md §4.5, §4.6 and §6.
 ### Pipeline and live board (M5): `rag/prompts.py`, `metrics.py`, `pipeline.py`, `answer_job.py`
 
 Design-rag.md §4.2.3–§4.2.5 and §4.4.3–§4.4.6.
-- **`prompts`:** `BASELINE_GUARDRAIL` (T6's text, verbatim), `LIVE_PROMPT` (the guardrail plus the injection and `INSUFFICIENT_CONTEXT` instructions), and `user_message`, which wraps each chunk in a tag named for its `resource_type`. `<`, `>` and `"` are replaced in chunk text, attributes and the question, so nothing can forge or close a tag.
+- **`prompts`:** `BASELINE_GUARDRAIL` (T6's text, verbatim), `LIVE_PROMPT` (the guardrail plus the injection and `INSUFFICIENT_CONTEXT` instructions), and `user_message`, which wraps each chunk in a tag named for its `resource_type`. `<`, `>` and `"` are replaced in chunk text, attributes and the question, so nothing can forge or close a tag. `clip` cuts a block over `PROMPT_CHUNK_MAX_TOKENS` (252) and adds ` …`; in practice only a long historical Q&A pair, which `chunk_qa` never splits.
 - **`metrics`:** `cpu_percent` is whole-host busy time from `psutil.cpu_times()` over the embed/query window and the generation window.
 - **`pipeline`:** `retrieve` (Infinity, then Chroma; the raw `1 − distance` is compared with the threshold), `generate` (one Ollama chat call), and `compare`, the fixed contract behind `POST /rag/compare`.
   - Upstream failures become 503 `UPSTREAM_UNAVAILABLE`, timeouts 504 `UPSTREAM_TIMEOUT`. Every call is bounded, and the whole compare has a 170 s deadline, under the harness's 180 s.

@@ -5,10 +5,12 @@ from __future__ import annotations
 from types import SimpleNamespace
 
 from app.services.rag import prompts
+from app.services.rag.tokens import count_tokens
 from app.services.rag.prompts import (
     BASELINE_GUARDRAIL,
     LIVE_PROMPT,
     LIVE_SUFFIX,
+    PROMPT_CHUNK_MAX_TOKENS,
     escape,
     user_message,
 )
@@ -100,3 +102,22 @@ def test_unknown_type_still_gets_a_source_attribute():
 def test_tag_name_is_sanitised():
     assert user_message([hit("bad tag=x")], "q").count("<context source=") == 1
     assert "<None" not in user_message([hit(None)], "q")
+
+
+def test_long_chunk_is_clipped_in_the_prompt_only():
+    # An unsplit Q&A pair can be ~5,000 tokens; the prompt keeps num_ctx's budget
+    document = "Question: T\n" + " ".join(["policy"] * 5000)
+    h = hit("historical_qa", document)
+    msg = user_message([h], "q")
+    body = msg.split(">", 2)[2].split("</historical_qa>")[0]
+    assert body.endswith(" …")
+    assert count_tokens(body.removesuffix(" …")) == PROMPT_CHUNK_MAX_TOKENS
+    assert body.startswith("Question: T\n")
+    assert h.document == document
+
+
+def test_chunk_at_the_budget_is_unchanged():
+    document = " ".join(["policy"] * PROMPT_CHUNK_MAX_TOKENS)
+    assert f">{document}</historical_qa>" in user_message(
+        [hit("historical_qa", document)], "q"
+    )
