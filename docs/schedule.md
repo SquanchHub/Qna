@@ -34,20 +34,22 @@ Work is split by file so the two of us never edit the same file:
 | M5: retrieval with threshold, tagged prompt with guardrail and escaping, `POST /api/courses/{course_id}/rag/compare` dry run with timings and CPU, background answer job (conditional `ai_status` writes, row-locked AI post and close, labeled and cited AI post); `test_rag_compare` and `test_rag_board` green apart from B12, whose off-topic question abstains as `NO_MATCH` (test fix for varikooty); U8 left for M5f (branch `feature/rag-pipeline`; plan in `docs/plan-m5-pipeline.md`) | T5, T6, T7 | vzhou2 | 2026-10-25 |
 | `test/rag-tests` and `feature/staff-theme` merged; first `main` → `production` deploy verified (VM at `http://34.121.90.110` serves the apps and `/api/health`; `production` is at the M4 merge) | T7, T8, T9 | varikooty | 2026-10-25 |
 | RAG services (`ollama`, `infinity`, `chroma`) in `docker-compose.prod.yml` with `mem_limit` 9g/4g, no published ports, backend RAG URLs pinned; Infinity serves MiniLM and gte only; nginx redirects bare app paths (branch `deploy/rag-services`) | T5, T9 | varikooty | 2026-10-25 |
+| `production` redeployed with M5 and the RAG services (merge of `main` through `fix/staff-live-api`) | T5, T9 | varikooty | 2026-10-27 |
+| Staff pages on the live API: `ragTypes.ts` matched to the real shapes, upload limits and accepted types read from the backend (`fix/staff-live-api`) | T4 | varikooty | 2026-10-26 |
+| B12 (`test_b12_decline_posts_nothing`) accepts `NO_MATCH` as inconclusive, like `ANSWERED` | T7 | varikooty | 2026-10-26 |
+| AI-answer label, citation links and `ai_status` polling in the student and staff apps (`feature/ai-answer-ui`); staff screenshots in `docs/ui/` | T5, T8 | varikooty | 2026-10-27 |
+| `eval/configs.json` and `eval/ingest_sample_data.py` (`eval/t6-report`) | T6 | varikooty | 2026-10-27 |
+| Individual documents `docs/varikooty.md` and `docs/vzhou2.md` | T10 | each | 2026-10-27 |
 
 ### Remaining
 
 | Milestone | Tasks | Owner | Target date |
 |---|---|---|---|
-| Staff pages switched from mock JSON to the live API, open-question TODOs resolved | T4 | varikooty | 2026-10-28 |
-| AI-answer label, citation links and status polling in the student and staff apps; staff screenshots in `docs/ui/` | T5, T8 | varikooty | 2026-10-29 |
-| Redeploy: merge `main` (M5 and the RAG services) into `production`; VM `.env` RAG block; models pulled into the VM's Ollama (`docker exec … ollama pull`, deployment Part 8 step 5.1); course seeded | T5, T9 | varikooty | 2026-10-30 |
+| Redeploy: merge current `main` (AI-answer UI and later) into `production`, which is at the `fix/staff-live-api` merge; confirm the VM `.env` RAG block, models pulled into the VM's Ollama (`docker exec … ollama pull`, deployment Part 8 step 5.1) and the course seeded | T5, T9 | varikooty | 2026-10-30 |
 | U8: browser check of 5 text-fragment citations against the real pages; any mismatch fixed in the chunkers | T4, T6 | vzhou2 | 2026-10-30 |
-| Eval dry run on the local stack: threshold calibrated, `eval/configs.json`, preflight and a harness run, so the VM run is a rerun | T6 | vzhou2 | 2026-10-29 |
+| Eval dry run on the local stack: threshold calibrated, preflight and a harness run, so the VM run is a rerun (`eval/configs.json` and `eval/ingest_sample_data.py` are merged; the local run was abandoned after a disk-full crash) | T6 | vzhou2 | 2026-10-29 |
 | `sample_data/` ingested on the VM under every profile, threshold calibrated, `eval/configs.json`, preflight, harness run against the deployment, `report.*` and `summary.md` committed | T6 | vzhou2 | 2026-10-31 |
-| B12 (`test_b12_decline_posts_nothing`) accepts `NO_MATCH` as inconclusive, like `ANSWERED` (`docs/plan-m5-pipeline.md` M5 results) | T7 | varikooty | 2026-10-29 |
 | Integration tests re-run against the full stack; CI pipeline green on `main` | T2, T7 | varikooty | 2026-10-31 |
-| Individual documents `docs/vzhou2.md` and `docs/varikooty.md` | T10 | each | 2026-11-01 |
 
 ## Check-ins
 
