@@ -328,6 +328,8 @@ Question: {question}
 
 Tag = the chunk's `resource_type`; in text and attributes `<`, `>`, `"` become `‹`, `›`, `'`. Ollama `POST /api/chat`, `stream: false`, options `temperature 0`, `seed 42`, `num_ctx 4096`, `num_predict 300` (expected answers are 1–3 sentences; 400 only lengthened rambling answers and pushed 3b toward the 100 s timeout; frozen before calibration and the committed run); `keep_alive` only via env.
 
+**Prompt clip.** Each context block holds at most `PROMPT_CHUNK_MAX_TOKENS` = 252 chunk tokens; a longer chunk is cut after its 252nd token and ends ` …`. Preset validation keeps every other chunk under 252, so in practice only a long historical Q&A pair is clipped, in the prompt only: the stored chunk and its citation are whole.
+
 **`num_ctx` budget (Qwen tokens):** system ≤ 200 + instructions and tags ≈ 150 + 4 chunks × ≤ 252 chunk tokens at up to ≈ 1.3× BPE ≈ 1310 + question (≤ 4000 chars) ≤ ≈ 1000 + `num_predict` 300 ≈ **2960 ≤ 4096**.
 
 #### 4.4.5 `POST /api/courses/{course_id}/rag/compare` (fixed contract)
@@ -422,7 +424,7 @@ Structural split identical in every profile; a fallback chunker runs only on ove
 - **HTML.** BeautifulSoup + lxml; remove `script`, `style`, `noscript`, `nav`, `header`, `footer`, `[role=navigation]`, `.sr-only`; root `<main>` or `#main-content`, else `<body>`; a section per h1–h3; block elements (`p`, `li`, `tr`, `div`, `h4`–`h6`, `br`) become display lines, whitespace collapsed, empties dropped. Prefix h1 > h2 > h3. In the schedule each h3 is a lecture day.
 - **Markdown.** Track fences (three backticks or `~~~`): lines inside are content, never start a section or reset, and markers stay in the text (a window may split a long code block; accepted). Outside fences `^#{1,3} ` starts a section; `^#{4,6} ` is a sub-heading used only by `reset_at: subheading`. Each chunk token remembers its line, giving exact `line_start`/`line_end`. Prefix `<file> > H1 > H2 > H3`.
 - **PDF.** `pypdf` page by page, each token remembers its page; `reset_at: none` streams pages together, `page` windows each page alone; `page_start` = first token's page. Prefix `<file> p.<n>` plus the page's first line.
-- **Historical Q&A.** A thread qualifies if it has an accepted ANSWER by a non-AI author, or is CLOSED with a STAFF ANSWER; the answer is the accepted non-AI post, else the latest STAFF ANSWER. Closed-with-neither, unaccepted student answers and AI posts (even accepted: they would duplicate chunks we hold and crowd out the primary citation) are excluded. Text `Question: <title>\n<body>\n\nAnswer: <answer>`. **A pair is never split unless it exceeds 222 chunk tokens** (fixed for every profile, keeping sliding-window profiles identical); then it is windowed with `default`, each window prefixed `Question: <title>` (≤ 30 tokens).
+- **Historical Q&A.** A thread qualifies if it has an accepted ANSWER by a non-AI author, or is CLOSED with a STAFF ANSWER; the answer is the accepted non-AI post, else the latest STAFF ANSWER. Closed-with-neither, unaccepted student answers and AI posts (even accepted: they would duplicate chunks we hold and crowd out the primary citation) are excluded. Text `Question: <title>\n<body>\n\nAnswer: <answer>`. **A pair is never split**, whatever its length and in every profile (T4: pairs are atomic). Infinity truncates MiniLM input at 256 tokens (checked 2026-10-28 on 0.0.77-cpu: appending ~2,000 tokens left the vector unchanged), so a long pair's MiniLM embedding covers the question and the start of the answer; gte-Qwen2 embeds it whole. The prompt clips it (§4.4.4).
 
 ```
 window(tokens, size, overlap):                  # reset_at boundaries split the stream into segments first
@@ -621,7 +623,7 @@ Ownership per `docs/schedule.md`: vzhou2 owns all of `backend/` (every `services
 ## 10. Testing plan
 
 **Unit (`tests/unit`, embeddings stubbed).**
-- Chunkers: markdown fences ignored for headings, exact line ranges (windowed and sub-heading reset); HTML on the real `syllabus.html`/`schedule.html` (nav and sr-only gone, one section per h1–h3, prefix truncation); PDF page tracking, `reset_at: page` never crosses pages; window arithmetic and whole-word expansion; semantic splits from stub similarities, oversized spans windowed not truncated; a > 222-token Q&A pair windowed with title prefixes.
+- Chunkers: markdown fences ignored for headings, exact line ranges (windowed and sub-heading reset); HTML on the real `syllabus.html`/`schedule.html` (nav and sr-only gone, one section per h1–h3, prefix truncation); PDF page tracking, `reset_at: page` never crosses pages; window arithmetic and whole-word expansion; semantic splits from stub similarities, oversized spans windowed not truncated; a long Q&A pair stays one chunk, and the prompt clips it to 252 tokens without changing shorter chunks.
 - Presets all validate; `chunk_size` 240 with MiniLM fails.
 - Citations: fragment encoding (`-` → `%2D`, em dash, one-line chunks); blob/`?plain=1`, raw `#page`, thread formats; **every ground-truth `expected_source` path is a substring of the URL built for that file**. IDs stable; heading rename changes the ID.
 - Misc: similarity `1 − d`, raw comparison, rounded response; `is_decline` cases; GitLab URL parsing and SHA `git_ref` rejection; SSRF blocks `localhost`, `10.x`, `169.254.169.254`, `ollama`; zip-slip, symlinks, byte and entry caps, top-level strip; git env has all four keys, header only for `GITLAB_HOST`; **`services/rag/pipeline.py` does not import `qa_service`**.
@@ -775,3 +777,16 @@ Goal: maximize, and report credibly, the threshold value, abstention rate, basel
 | Warm the model before the committed run | Graders' re-run starts cold, so our max/mean would not reproduce | **Dropped**, stated as a rule | 11.3 |
 | Raise `RAG_TOP_K` | Lifts every run equally (no comparison changes) and lengthens prompts | **Dropped** | 4.3.2 |
 | `num_predict` 400 → 300 | Changes answers, so must be fixed before the run; 200 risks truncating q09-length answers | **Kept at 300**, frozen; 200 only if U7 fails | 4.4.4, 12 |
+
+---
+
+## 15. Revision after the run-plus-0 grade report (2026-10-28)
+
+R5 (G5) found that a historical Q&A pair over 222 tokens was windowed, against T4's "don't split historical Q&A pairs". The 222 cap came from Goldfish finding M8 (§13), to fit MiniLM's 256 tokens and the `num_ctx` budget.
+
+| Change | Why it is safe | Section |
+|---|---|---|
+| `chunk_qa` returns one chunk per pair, always; `QA_MAX_TOKENS` removed | Infinity truncates over-long MiniLM input itself (verified), so ingestion cannot fail on a long pair | 4.5.4 |
+| `user_message` clips any context block to 252 chunk tokens, ending ` …` | Keeps the §4.4.4 budget; chunks at or under 252 tokens are passed through unchanged, so answers on normal threads do not move | 4.4.4 |
+| Re-sync the historical-Q&A resource under every profile after deploy | Only pairs that were over 222 tokens change chunk IDs; re-sync adds the whole pair and deletes the old windows | 4.5.6 |
+

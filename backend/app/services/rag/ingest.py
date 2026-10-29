@@ -144,9 +144,7 @@ def qa_chunks(resource, profile, threads: list[QaThread], job_id: int):
     chunks = [
         chunk
         for t in threads
-        for chunk in chunk_qa(
-            t.question_id, t.title, t.body, t.answer, profile.chunking
-        )
+        for chunk in chunk_qa(t.question_id, t.title, t.body, t.answer)
     ]
     ctx = CitationContext(
         kind="internal",

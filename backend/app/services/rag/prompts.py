@@ -8,6 +8,8 @@ from __future__ import annotations
 
 import re
 
+from .tokens import count_tokens, tokenize
+
 BASELINE_GUARDRAIL = (
     "Only use the information provided in the tagged context to answer questions. "
     "If the context does not contain enough information to answer, say so rather "
@@ -21,6 +23,11 @@ LIVE_SUFFIX = (
 LIVE_PROMPT = BASELINE_GUARDRAIL + " " + LIVE_SUFFIX
 
 INSTRUCTION = "Answer the question using only the tagged context below."
+
+# Chunk tokens per context block. Chunkers stay under this (222 + a 30-token
+# heading prefix), but a historical Q&A pair is never split, so a long one is
+# clipped here, in the prompt only, to keep num_ctx's budget (§4.4.4).
+PROMPT_CHUNK_MAX_TOKENS = 252
 
 # Per chunk type: (attribute, how to read it from the chunk's Chroma metadata).
 # `source` comes first for every type, including any not listed here.
@@ -52,6 +59,14 @@ def escape(text: str) -> str:
     return str(text).translate(_ESCAPES)
 
 
+def clip(document: str) -> str:
+    """The first PROMPT_CHUNK_MAX_TOKENS tokens, then " …"; shorter text as is."""
+    if count_tokens(document) <= PROMPT_CHUNK_MAX_TOKENS:
+        return document
+    end = tokenize(document)[PROMPT_CHUNK_MAX_TOKENS - 1].end
+    return document[:end] + " …"
+
+
 def _tag(document: str, metadata: dict) -> str:
     tag = metadata.get("resource_type")
     if not isinstance(tag, str) or not _TAG_NAME.fullmatch(tag):
@@ -61,7 +76,7 @@ def _tag(document: str, metadata: dict) -> str:
     rendered = "".join(
         f' {name}="{escape(value)}"' for name, value in attrs if value is not None
     )
-    return f"<{tag}{rendered}>{escape(document)}</{tag}>"
+    return f"<{tag}{rendered}>{escape(clip(document))}</{tag}>"
 
 
 def user_message(hits, question: str) -> str:

@@ -24,8 +24,6 @@ FALLBACK_KEYS = {
 
 # [CLS] + [SEP] + whole-word expansion slack (chunking.EXPANSION_SLACK)
 BUDGET_RESERVE = 4
-# A Q&A pair longer than this is windowed; fixed for every profile
-QA_MAX_TOKENS = 222
 
 _BASE_WINDOW = {"method": "sliding_window", "chunk_size": 200, "chunk_overlap": 40}
 
@@ -183,7 +181,6 @@ def validate_chunking(chunking: dict, model: str) -> None:
     for chunk_type, cfg in per_type.items():
         sizes += _check_fallback(cfg, chunk_type)
     limit = MAX_INPUT_TOKENS[model]
-    # A whole Q&A pair (no prefix) fits in the smallest limit, 256
     for size in sizes:
         if size + prefix + BUDGET_RESERVE > limit:
             raise ValueError(

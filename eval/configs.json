@@ -1,6 +1,6 @@
 {
   "_comment": "T6 one-factor-at-a-time matrix (design-rag.md §11.3). Baseline: sliding-window profile (MiniLM), the team default threshold RAG_DEFAULT_THRESHOLD=0.50, T5's baseline guardrail verbatim (BASELINE_GUARDRAIL in backend/app/services/rag/prompts.py), qwen2.5:1.5b. Each comparison overrides exactly one field. Thresholds are baseline ± 0.15. course_id is the deployed VM's seeded 'AI-Assisted Software Development' course (its threads supply q12/q13), ingested with eval/ingest_sample_data.py.",
-  "course_id": 642,
+  "course_id": 1,
   "baseline": {
     "ingestion_profile": "sliding-window",
     "similarity_threshold": 0.5,

@@ -28,7 +28,6 @@ from app.services.rag.citations import assign_ids
 from app.services.rag.presets import (
     MAX_INPUT_TOKENS,
     PRESETS,
-    QA_MAX_TOKENS,
     fallback_for,
 )
 from app.services.rag.tokens import count_tokens, tokenize
@@ -458,21 +457,22 @@ def _pair_of(n_tokens):
     return " ".join(["policy"] * body_tokens)
 
 
-def test_qa_pair_at_limit_is_one_chunk():
-    body = _pair_of(QA_MAX_TOKENS)
-    chunks = chunk_qa(7, "T", body, "done", BASELINE)
+def test_qa_pair_is_one_chunk():
+    body = _pair_of(200)
+    chunks = chunk_qa(7, "T", body, "done")
     assert len(chunks) == 1
     assert chunks[0].prefix == "" and chunks[0].text.startswith("Question: T\n")
     assert chunks[0].question_id == 7
 
 
-def test_long_qa_pair_is_windowed_with_title_prefixes():
-    body = _pair_of(QA_MAX_TOKENS + 1)
-    chunks = chunk_qa(7, "Why does alembic fail?", body, "done", BASELINE)
-    assert len(chunks) == 2
-    assert all(c.prefix == "Question: Why does alembic fail?" for c in chunks)
-    assert all(c.title == "Why does alembic fail?" for c in chunks)
-    assert chunks[-1].text.endswith("Answer: done")
+def test_long_qa_pair_is_never_split():
+    # T4: historical Q&A pairs are atomic, however long
+    body = _pair_of(5000)
+    chunks = chunk_qa(7, "T", body, "done")
+    assert len(chunks) == 1
+    assert chunks[0].prefix == ""
+    assert chunks[0].text == f"Question: T\n{body}\n\nAnswer: done"
+    assert count_tokens(chunks[0].text) == 5000
 
 
 # Every sample file under every preset
